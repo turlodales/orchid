@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'dart:ui';
 import 'package:flutter/painting.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:orchid/api/orchid_crypto.dart';
@@ -10,7 +9,7 @@ import 'mersenne_random.dart';
 /// Render an identicon from rotated and translated overlapping rects.
 // Ported from https://github.com/MetaMask/jazzicon (ISC License 2020 MetaMask)
 class Jazzicon {
-  MersenneTwisterRandom _random;
+  late MersenneTwisterRandom _random;
 
   static final colors = [
     ColorExtensions.fromHexString('#01888C'), // teal
@@ -25,7 +24,7 @@ class Jazzicon {
     ColorExtensions.fromHexString('#F19E02'), // gold
   ];
 
-  SvgPicture generate({int diameter, EthereumAddress address}) {
+  SvgPicture generate({required int diameter, required EthereumAddress address}) {
     return generateFromHexString(diameter, address.toString());
   }
 

@@ -34,19 +34,13 @@ class Family :
   private:
     uint32_t Analyze(const Window &data) {
         uint8_t vhl = 0;
-        data.each([&](const uint8_t *data, size_t size) {
-            if (size >= 1) {
-                vhl = data[0];
-                return false;
-            }
-            return true;
-        });
+        data.snip(1).copy(&vhl, 1);
         auto protocol(vhl >> 4);
         switch (protocol) {
         case 4: return AF_INET;
         case 6: return AF_INET6;
+        default: return 0;
         }
-        return 0;
     }
 
   protected:

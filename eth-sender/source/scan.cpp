@@ -39,7 +39,7 @@ bool Similar(const Address &address, const Nibbles &nibbles) {
 template <size_t Size_, typename Code_, typename Each_>
 task<void> Scan(const Brick<32> &root, Code_ &&code, Each_ &&each) {
     std::set<Nibbles> todo;
-    todo.emplace(Nibbles());
+    todo.emplace();
 
     std::set<Nibbles> done;
 
@@ -57,14 +57,20 @@ task<void> Scan(const Brick<32> &root, Code_ &&code, Each_ &&each) {
         auto check(root);
 
         const auto proofs(co_await code(preimage));
-        for (size_t i(0); i != proofs.size(); ++i) {
+        for (size_t e(proofs.size()), i(0); i != e; ++i) {
+            const auto data(Bless(Str(proofs[i])));
+
+            // XXX: xDAI returns a... "terminating" 0x?!
+            if (data.done()) {
+                orc_assert(i == e - 1);
+                break;
+            }
+
             const auto here(hash.substr(0, offset));
             done.emplace(here);
             todo.erase(here);
 
-            const auto data(Bless(Str(proofs[i])));
             orc_assert(HashK(data) == check);
-
             const auto proof(Explode(data));
             switch (proof.size()) {
                 case 2: {
@@ -73,7 +79,7 @@ task<void> Scan(const Brick<32> &root, Code_ &&code, Each_ &&each) {
 
                     const auto there(here + leg.hex(false).substr(2 - (type & 0x1)));
                     if ((type & 0x2) == 0) {
-                        check = hash.substr(there.size()) != there ? EmptyVector : Brick<32>(proof[1].buf());
+                        check = hash.substr(0, there.size()) != there ? EmptyVector : Brick<32>(proof[1].buf());
                         offset = there.size();
                         if (!done.contains(there))
                             todo.emplace(there);
@@ -85,7 +91,7 @@ task<void> Scan(const Brick<32> &root, Code_ &&code, Each_ &&each) {
                 } break;
 
                 case 17: {
-                    const auto scalar(proof[Bless(hash[offset++])]);
+                    const auto &scalar(proof[Bless(hash[offset++])]);
                     check = scalar.zero() ? EmptyVector : Brick<32>(scalar.buf());
 
                     orc_assert(proof[16].buf().done());

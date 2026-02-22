@@ -1,35 +1,35 @@
+import 'package:orchid/orchid/orchid.dart';
 import 'package:browser_detector/browser_detector.dart';
-import 'package:orchid/orchid.dart';
-import 'package:orchid/api/configuration/orchid_user_config/orchid_account_import.dart';
+import 'package:orchid/api/orchid_user_config/orchid_account_import.dart';
 import 'package:orchid/api/orchid_platform.dart';
 import 'package:orchid/common/qrcode_scan.dart';
 import 'package:orchid/common/app_dialogs.dart';
 import 'package:flutter/services.dart';
 import 'package:orchid/orchid/field/orchid_labeled_text_field.dart';
-import 'package:orchid/orchid/orchid_asset.dart';
 
 /// Scan or paste an identity
-class OrchidLabeledIdentityField extends StatefulWidget {
+class OrchidLabeledImportIdentityField extends StatefulWidget {
   final String label;
 
   /// Callback fires on changes with either a valid parsed account or null if the form state is invalid or incomplete.
-  final void Function(ParseOrchidIdentityResult parsed) onChange;
-  final double spacing;
+  final void Function(ParseOrchidIdentityOrAccountResult? parsed) onChange;
 
-  const OrchidLabeledIdentityField({
-    Key key,
-    @required this.label,
-    @required this.onChange,
-    this.spacing,
+  // final double spacing;
+
+  const OrchidLabeledImportIdentityField({
+    Key? key,
+    required this.label,
+    required this.onChange,
+    // this.spacing,
   }) : super(key: key);
 
   @override
-  _OrchidLabeledIdentityFieldState createState() =>
-      _OrchidLabeledIdentityFieldState();
+  _OrchidLabeledImportIdentityFieldState createState() =>
+      _OrchidLabeledImportIdentityFieldState();
 }
 
-class _OrchidLabeledIdentityFieldState
-    extends State<OrchidLabeledIdentityField> {
+class _OrchidLabeledImportIdentityFieldState
+    extends State<OrchidLabeledImportIdentityField> {
   var _pasteField = TextEditingController();
 
   // cache the results of the last validation
@@ -88,19 +88,20 @@ class _OrchidLabeledIdentityFieldState
 
   /// Scan a QR Code and add the text to the field
   void _scanCode() async {
-    try {
-      String text = await QRCode.scan();
-      if (text == null) {
-        log("user cancelled scan");
-        return;
+    QRCodeScanner.scan(context, (String text) {
+      try {
+        if (text == null) {
+          log("user cancelled scan");
+          return;
+        }
+        setState(() {
+          _pasteField.text = text;
+        });
+      } catch (err) {
+        print("error scanning orchid account: $err");
       }
-      setState(() {
-        _pasteField.text = text;
-      });
-    } catch (err) {
-      print("error scanning orchid account: $err");
-    }
-    _validateCodeAndFireCallback(fromScan: true);
+      _validateCodeAndFireCallback(fromScan: true);
+    });
   }
 
   /// Paste code from the clipboard via the paste button
@@ -108,10 +109,12 @@ class _OrchidLabeledIdentityFieldState
   // https://github.com/flutter/flutter/issues/48581
   void _pasteCode() async {
     try {
-      ClipboardData data = await Clipboard.getData('text/plain');
-      setState(() {
-        _pasteField.text = data.text;
-      });
+      ClipboardData? data = await Clipboard.getData('text/plain');
+      if (data?.text != null) {
+        setState(() {
+          _pasteField.text = data!.text!;
+        });
+      }
     } catch (err) {
       print("Can't get clipboard: $err");
     }
@@ -130,7 +133,7 @@ class _OrchidLabeledIdentityFieldState
       widget.onChange(parsed);
       isValid = true;
       log("pasted code valid = $parsed");
-    } catch (err) {
+    } catch (err, stack) {
       widget.onChange(null);
       isValid = false;
       if (fromPaste) {
@@ -138,7 +141,7 @@ class _OrchidLabeledIdentityFieldState
       } else if (fromScan) {
         _scanQRCodeError();
       }
-      print("error parsing pasted orchid account: $err");
+      print("error parsing pasted orchid account: $err, \n$stack");
     }
     setState(() {});
   }
@@ -157,8 +160,8 @@ class _OrchidLabeledIdentityFieldState
         bodyText: s.theCodeYouPastedDoesNot);
   }
 
-  ParseOrchidIdentityResult _parse(String text) {
-    return ParseOrchidIdentityResult.parse(text);
+  ParseOrchidIdentityOrAccountResult _parse(String text) {
+    return OrchidAccountImport.parse(text);
   }
 
   @override

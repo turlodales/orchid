@@ -35,7 +35,7 @@ DWORD getTunIndex() {
     auto pAddresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(addresses.get());
 
     for (;;) {
-        DWORD r = GetAdaptersAddresses(AF_INET,
+        const DWORD r = GetAdaptersAddresses(AF_INET,
                                        GAA_FLAG_SKIP_ANYCAST|GAA_FLAG_SKIP_MULTICAST|
                                        GAA_FLAG_SKIP_DNS_SERVER|GAA_FLAG_SKIP_FRIENDLY_NAME,
                                        nullptr, pAddresses, &dwSize);
@@ -61,7 +61,7 @@ DWORD getTunIndex() {
         if (curAddress->FirstUnicastAddress == nullptr) {
             continue;
         }
-        sockaddr_in *sin = reinterpret_cast<sockaddr_in*>(curAddress->FirstUnicastAddress->Address.lpSockaddr);
+        const auto sin = reinterpret_cast<sockaddr_in*>(curAddress->FirstUnicastAddress->Address.lpSockaddr);
         if (sin->sin_addr.s_addr == htonl(Host_.operator uint32_t())) {
             return curAddress->IfIndex;
         }
@@ -78,7 +78,7 @@ std::pair<DWORD, DWORD> default_gateway_outside_tun(u_long dest)
     auto pIpForwardTable = reinterpret_cast<PMIB_IPFORWARDTABLE>(ipForwardTable.get());
 
     for (;;) {
-        DWORD r = GetIpForwardTable(pIpForwardTable, &dwSize, 0);
+        const DWORD r = GetIpForwardTable(pIpForwardTable, &dwSize, 0);
         if (r == ERROR_INSUFFICIENT_BUFFER) {
             ipForwardTable = std::make_unique<uint8_t[]>(dwSize);
             pIpForwardTable = reinterpret_cast<PMIB_IPFORWARDTABLE>(ipForwardTable.get());
@@ -95,12 +95,13 @@ std::pair<DWORD, DWORD> default_gateway_outside_tun(u_long dest)
         break;
     }
 
-    DWORD tunIndex = getTunIndex();
+    const DWORD tunIndex = getTunIndex();
     DWORD prefix = 0;
     DWORD index = -1;
     DWORD metric = ULONG_MAX;
     DWORD nextHop = 0;
     for (DWORD i = 0; i < pIpForwardTable->dwNumEntries; i++) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
         PMIB_IPFORWARDROW row = &pIpForwardTable->table[i];
         if (row->dwForwardType == MIB_IPROUTE_TYPE_INVALID) {
             continue;
@@ -111,7 +112,7 @@ std::pair<DWORD, DWORD> default_gateway_outside_tun(u_long dest)
         if (!SUBNET_EQ(row->dwForwardDest, row->dwForwardMask, dest)) {
             continue;
         }
-        DWORD forwardPrefix = dest & row->dwForwardMask;
+        const DWORD forwardPrefix = dest & row->dwForwardMask;
         if (forwardPrefix > prefix || (forwardPrefix == prefix && row->dwForwardMetric1 < metric)) {
             prefix = forwardPrefix;
             index = row->dwForwardIfIndex;
@@ -129,7 +130,7 @@ std::unique_ptr<sockaddr_storage> get_addr_by_index(DWORD index)
     auto pAddresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(addresses.get());
 
     for (;;) {
-        DWORD r = GetAdaptersAddresses(AF_INET,
+        const DWORD r = GetAdaptersAddresses(AF_INET,
                                        GAA_FLAG_SKIP_ANYCAST|GAA_FLAG_SKIP_MULTICAST|
                                        GAA_FLAG_SKIP_DNS_SERVER|GAA_FLAG_SKIP_FRIENDLY_NAME,
                                        nullptr, pAddresses, &dwSize);
@@ -165,7 +166,7 @@ int Protect(SOCKET socket, int (*attach)(SOCKET, const sockaddr *, socklen_t), c
     if (address->sa_family != AF_INET) {
         return attach(socket, address, length);
     }
-    const sockaddr_in *sin = reinterpret_cast<const sockaddr_in *>(address);
+    const auto sin = reinterpret_cast<const sockaddr_in *>(address);
 
     auto [index, gateway] = default_gateway_outside_tun(sin->sin_addr.s_addr);
 
@@ -174,7 +175,7 @@ int Protect(SOCKET socket, int (*attach)(SOCKET, const sockaddr *, socklen_t), c
     auto pAddresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(addresses.get());
 
     for (;;) {
-        DWORD r = GetAdaptersAddresses(AF_INET,
+        const DWORD r = GetAdaptersAddresses(AF_INET,
                                        GAA_FLAG_SKIP_ANYCAST|GAA_FLAG_SKIP_MULTICAST|
                                        GAA_FLAG_SKIP_DNS_SERVER|GAA_FLAG_SKIP_FRIENDLY_NAME,
                                        nullptr, pAddresses, &dwSize);
@@ -207,7 +208,7 @@ int Protect(SOCKET socket, int (*attach)(SOCKET, const sockaddr *, socklen_t), c
         bool done = false;
         for (auto ua = curAddress->FirstUnicastAddress; ua != nullptr; ua = ua->Next) {
             auto a = ua->Address;
-            sockaddr_in *sin = reinterpret_cast<sockaddr_in*>(a.lpSockaddr);
+            const auto sin = reinterpret_cast<sockaddr_in*>(a.lpSockaddr);
             ULONG mask;
             ConvertLengthToIpv4Mask(ua->OnLinkPrefixLength, &mask);
             if (SUBNET_EQ(sin->sin_addr.s_addr, mask, gateway)) {

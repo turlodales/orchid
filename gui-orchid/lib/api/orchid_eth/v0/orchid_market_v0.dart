@@ -1,6 +1,6 @@
 import 'dart:math';
-import 'package:orchid/api/orchid_budget_api.dart';
-import 'package:orchid/util/units.dart';
+import 'package:orchid/api/orchid_eth/orchid_lottery.dart';
+import 'package:orchid/api/orchid_eth/tokens_legacy.dart';
 import '../../pricing/orchid_pricing_v0.dart';
 import '../orchid_market.dart';
 import '../chains.dart';
@@ -25,7 +25,7 @@ class MarketConditionsV0 implements MarketConditions {
   // TODO: Add refresh option
   static Future<MarketConditionsV0> forPotV0(LotteryPot pot) async {
     // TODO: Add refresh option
-    return forBalanceV0(pot.balance, pot.effectiveDeposit);
+    return forBalanceV0(pot.balance as OXT, pot.effectiveDeposit as OXT);
   }
 
   // TODO: Add refresh option
@@ -34,22 +34,22 @@ class MarketConditionsV0 implements MarketConditions {
     // log("eth v0: Fetch market conditions");
     // TODO: Add refresh option
     var costToRedeem = await getCostToRedeemTicketV0();
-    var limitedByBalance = balance.floatValue <= (escrow / 2.0).floatValue;
+    var limitedByBalance = balance.doubleValue <= (escrow / 2.0).doubleValue;
     Token maxFaceValue = LotteryPot.maxTicketFaceValueFor(balance, escrow);
 
     // value received as a fraction of ticket face value
-    double efficiency = maxFaceValue.floatValue == 0
+    double efficiency = maxFaceValue.doubleValue == 0
         ? 0
         : max(
                 0,
-                (maxFaceValue - costToRedeem.oxtCostToRedeem).floatValue /
-                    maxFaceValue.floatValue)
+                (maxFaceValue - costToRedeem.oxtCostToRedeem).doubleValue /
+                    maxFaceValue.doubleValue)
             .toDouble();
 
     return new MarketConditionsV0(
         costToRedeem.gasCostToRedeem,
         costToRedeem.oxtCostToRedeem,
-        maxFaceValue,
+        maxFaceValue as OXT,
         efficiency,
         limitedByBalance);
   }
@@ -60,9 +60,12 @@ class MarketConditionsV0 implements MarketConditions {
     GWEI gasPrice =
         GWEI.fromWei((await Chains.Ethereum.getGasPrice()).intValue);
     ETH ethGasCostToRedeem =
-        (gasPrice * OrchidContractV0.gasCostToRedeemTicketV0).toEth();
+        (gasPrice * OrchidContractV0.gasLimitToRedeemTicketV0).toEth();
 
-    PricingV0 pricingV0 = await OrchidPricingAPIV0().getPricing();
+    PricingV0? pricingV0 = await OrchidPricingAPIV0().getPricing();
+    if (pricingV0 == null) {
+      throw Exception("no pricing");
+    }
     OXT oxtCostToRedeem = pricingV0.ethToOxt(ethGasCostToRedeem);
 
     // TODO: Migrate to v1

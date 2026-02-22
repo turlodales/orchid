@@ -1,5 +1,4 @@
 import 'dart:ui';
-import 'package:meta/meta.dart';
 
 class PathDash {
 
@@ -16,12 +15,11 @@ class PathDash {
   /// Source:
   /// https://raw.githubusercontent.com/dnfield/flutter_path_drawing/master/lib/src/dash_path.dart
   ///
-  static Path dash(
-      Path source, {
-        @required CircularIntervalList<double> dashArray,
-        DashOffset dashOffset,
+  static Path? dash(
+      Path? source, {
+        required CircularIntervalList<double> dashArray,
+        DashOffset? dashOffset,
       }) {
-    assert(dashArray != null);
     if (source == null) {
       return null;
     }

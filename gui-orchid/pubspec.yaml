@@ -1,5 +1,6 @@
 name: orchid
 description: Silicon Valley (Season 4)
+publish_to: none
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -10,49 +11,47 @@ description: Silicon Valley (Season 4)
 version: 0.9.0+1
 
 environment:
-  sdk: ">=2.7.0 <3.0.0"
+  sdk: ">=3.3.0 <4.0.0"
 
 dependencies:
-  badges: 1.2.0
-  # XXX: use https://pub.dev/packages/firebase_ml_vision
-  # that said, this library has been *discontinued*
-  # this library can be upgraded to at least 3.0.1
-  barcode_scan: 2.0.2
-  browser_detector: ^2.0.0
+  badges: 3.1.1
+  browser_detector: 2.0.0
   cupertino_icons: 1.0.2
-  dartjsengine: 1.0.1
   dotted_border: 2.0.0+2
   email_validator: 2.0.1
+  fixnum: 1.1.0
+  flutter_js: 0.8.5
   flutter:
     sdk: flutter
-  flutter_cupertino_localizations: 1.0.1
-  flutter_html: ^3.0.0-alpha.3
+  flutter_html: 3.0.0-beta.2
   flutter_localizations:
     sdk: flutter
   #flutter_secure_storage: 3.3.5 # XXX: macOS
-  flutter_svg: 1.0.3
+  flutter_svg: 2.1.0
   font_awesome_flutter: 9.0.0
-  http: 0.13.4
-  in_app_purchase:
-    path: in_app_purchase
-  intl: 0.17.0
+  http: 1.1.0
+  in_app_purchase_storekit: 0.4.7
+  in_app_purchase_android: 0.3.6+8
+  intl: 0.20.2
   jdenticon_dart: 2.0.0
+  decimal: 3.2.4
+  mobile_scanner: 5.2.1
   percent_indicator: 3.0.1
-  pointycastle: 3.5.0
+  pointycastle: 4.0.0
   provider: 5.0.0
   qr_flutter: 4.0.0
-  rxdart: 0.25.0
-  shared_preferences: 2.0.12
-  styled_text: 3.0.4
-  sqflite: 2.0.0+3
-  url_launcher: 6.0.3
-  uuid: 3.0.5
-  web3dart: 2.3.3
+  rxdart: 0.27.7
+  shared_preferences: 2.3.2
+  styled_text: 8.1.0
+  sqflite: 2.3.3+2
+  url_launcher: 6.3.1
+  uuid: 4.5.1
+  web3dart: 3.0.1 # Utils used in orchid_crypto
   window_size:
     path: flutter-desktop-embedding/plugins/window_size
 
 dev_dependencies:
-  dart_code_metrics: ^4.16.0
+#  dart_code_metrics: 4.21.3
   flutter_test:
     sdk: flutter
   pedantic: 1.11.0

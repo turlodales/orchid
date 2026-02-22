@@ -1,7 +1,6 @@
 /android/app
 /android/local.properties
 /.dart_tool
-/.flutter-plugins
 /.flutter-plugins-dependencies
 /in_app_purchase
 /ios/Flutter
@@ -18,4 +17,4 @@
 build
 test/receipt_local.txt
 *.log
-untransleted.txt
+untranslated.txt

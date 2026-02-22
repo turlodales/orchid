@@ -43,6 +43,7 @@ cfg="${curdir}/${output}/${arch}/meson.cfg"
 echo "${wflags[@]}" >"${curdir}/${output}/${arch}/meson.cfg"
 cfg=(--config "${cfg}")
 
+
 function args() {
     comma=false
     for arg in "$@"; do
@@ -70,7 +71,7 @@ ld = 'ld'
 ar = '${ar}'
 strip = '${strip}'
 windres = '${windres}'
-pkgconfig = '${curdir}/env/pkg-config'
+pkgconfig = '${curdir}/env/pkg-config.sh'
 
 [properties]
 needs_exe_wrapper = true

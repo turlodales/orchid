@@ -1,19 +1,19 @@
-import 'package:orchid/api/orchid_budget_api.dart';
+import 'package:orchid/api/orchid_eth/orchid_lottery.dart';
 import 'package:orchid/api/orchid_eth/orchid_account.dart';
 import 'package:orchid/api/orchid_eth/orchid_market.dart';
 import 'package:orchid/api/pricing/orchid_pricing.dart';
 import 'package:orchid/api/pricing/orchid_pricing_v0.dart';
 import 'package:orchid/common/app_dialogs.dart';
 import 'package:orchid/common/link_text.dart';
-import 'package:orchid/orchid.dart';
-import 'package:orchid/util/units.dart';
+import 'package:orchid/orchid/orchid.dart';
+import 'package:orchid/util/format_decimal.dart';
 
 class MarketStatsDialog {
   static Future<void> show({
-    @required BuildContext context,
-    @required Account account,
-    @required LotteryPot lotteryPot,
-    @required MarketConditions marketConditions,
+    required BuildContext context,
+    required Account account,
+    required LotteryPot? lotteryPot,
+    required MarketConditions? marketConditions,
   }) async {
     if (lotteryPot == null || marketConditions == null) {
       return;
@@ -22,14 +22,16 @@ class MarketStatsDialog {
 
     var gasPrice = await account.chain.getGasPrice();
     // bool gasPriceHigh = gasPrice.value >= 50.0;
-    bool gasPriceHigh = false;
 
     List<Widget> tokenPrices;
     if (account.isV0) {
-      PricingV0 pricing = await OrchidPricingAPIV0().getPricing();
-      var ethPriceText = formatCurrency(1.0 / pricing?.ethPriceUSD,
+      PricingV0? pricing = await OrchidPricingAPIV0().getPricing();
+      if (pricing == null) {
+        return;
+      }
+      var ethPriceText = formatDouble(1.0 / pricing.ethPriceUSD,
           locale: context.locale, suffix: 'USD');
-      var oxtPriceText = formatCurrency(1.0 / pricing?.oxtPriceUSD,
+      var oxtPriceText = formatDouble(1.0 / pricing.oxtPriceUSD,
           locale: context.locale, suffix: 'USD');
       tokenPrices = [
         Text(s.ethPrice + " " + ethPriceText).body2,
@@ -39,7 +41,7 @@ class MarketStatsDialog {
       var tokenType = account.chain.nativeCurrency;
       var tokenPrice = await OrchidPricing().tokenToUsdRate(tokenType);
       var priceText =
-          formatCurrency(tokenPrice, locale: context.locale, suffix: 'USD');
+          formatDouble(tokenPrice, locale: context.locale, suffix: 'USD');
       tokenPrices = [
         Text(tokenType.symbol + ' ' + s.price + ': ' + priceText).body2,
       ];
@@ -47,7 +49,7 @@ class MarketStatsDialog {
 
     // Show gas prices as "GWEI" regardless of token type.
     var gasPriceGwei = gasPrice.multiplyDouble(1e9);
-    var gasPriceText = formatCurrency(gasPriceGwei.floatValue,
+    var gasPriceText = formatDouble(gasPriceGwei.doubleValue,
         locale: context.locale, suffix: 'GWEI');
 
     String maxFaceValueText =
@@ -55,8 +57,8 @@ class MarketStatsDialog {
     String costToRedeemText =
         marketConditions.costToRedeem.formatCurrency(locale: context.locale);
 
-    bool ticketUnderwater = marketConditions.costToRedeem.floatValue >=
-        marketConditions.maxFaceValue.floatValue;
+    bool ticketUnderwater = marketConditions.costToRedeem.doubleValue >=
+        marketConditions.maxFaceValue.doubleValue;
 
     String limitedByText = marketConditions.limitedByBalance
         ? s.yourMaxTicketValueIsCurrentlyLimitedByYourBalance +
@@ -80,11 +82,13 @@ class MarketStatsDialog {
           Text(s.prices).title,
           pady(4),
           ...tokenPrices,
-          Text(s.gasPrice + " " + gasPriceText,
-                  style: gasPriceHigh
-                      ? OrchidText.body1.copyWith(color: Colors.red)
-                      : OrchidText.body1)
-              .body2,
+          Text(
+            s.gasPrice + " " + gasPriceText,
+            // style: gasPriceHigh
+            //     ? OrchidText.body1.copyWith(color: Colors.red)
+            //     : OrchidText.body1,
+            style: OrchidText.body1,
+          ).body2,
           pady(16),
           Text(s.ticketValue).title,
           pady(4),

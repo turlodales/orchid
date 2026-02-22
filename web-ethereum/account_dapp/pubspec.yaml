@@ -1,0 +1,85 @@
+name: orchid
+description: Orchid Account dApp
+publish_to: none
+
+version: 0.9.0+1
+
+environment:
+  sdk: ">=3.0.6 <4.0.0"
+
+dependencies:
+  badges: 3.1.1
+  cupertino_icons: 1.0.2
+  dotted_border: 2.0.0+2
+  email_validator: 2.0.1
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_svg: 2.1.0
+  font_awesome_flutter: 9.0.0
+  intl: 0.20.2
+  jdenticon_dart: 2.0.0
+  percent_indicator: 3.0.1
+  pointycastle: 4.0.0
+  qr_flutter: 4.0.0
+  rxdart: 0.27.7
+  shared_preferences: 2.0.5
+  styled_text: 4.0.0
+  url_launcher: 6.3.2
+  uuid: 4.5.1
+  web3dart: 3.0.1 # Utils used in orchid_crypto
+  decimal: 3.2.4
+
+  #flutter_web3: 2.1.9 # Dapp ether.js and WalletConnect wrapper
+  flutter_web3:
+    path: flutter_web3
+
+  flutter_lints: 1.0.0
+  browser_detector: 2.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  pedantic: 1.11.0
+
+flutter:
+  generate: true
+  uses-material-design: true
+
+  assets:
+    - assets/docs/
+    - assets/images/
+    - assets/svg/
+    - assets/svg/chains/
+    - assets/svg/tokens/
+
+  fonts:
+    - family: Baloo2
+      fonts:
+        - asset: assets/fonts/Baloo2-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Baloo2-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Baloo2-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Baloo2-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Baloo2-ExtraBold.ttf
+          weight: 800
+
+flutter_intl:
+  enabled: false
+
+# Not sure that these are working
+targets:
+  $default:
+    sources:
+      exclude:
+        - lib/common/qrcode_scan.dart
+        - lib/api/configuration
+        - lib/api/monitoring
+        - lib/api/purchase
+        - lib/api/orchid_api.dart
+        - lib/api/orchid_api_mock.dart
+        - lib/api/orchid_api_real.dart

@@ -1,7 +1,7 @@
-import 'package:orchid/api/orchid_log_api.dart';
+import 'package:orchid/api/orchid_log.dart';
 import 'package:orchid/api/orchid_eth/orchid_account_mock.dart';
-import 'package:orchid/api/preferences/user_preferences_mock.dart';
-import 'account_view_model.dart';
+import 'package:orchid/vpn/preferences/user_preferences_mock.dart';
+import '../../orchid/account/account_view_model.dart';
 
 class AccountManagerMock {
 // The Account Manager page view model.

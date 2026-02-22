@@ -1,19 +1,17 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:orchid/api/orchid_eth/orchid_account.dart';
-import 'package:orchid/api/orchid_crypto.dart';
 import 'package:orchid/api/orchid_eth/v0/orchid_eth_v0.dart';
 import 'package:orchid/api/orchid_eth/v1/orchid_eth_v1.dart';
-import 'package:orchid/api/orchid_log_api.dart';
-import 'package:orchid/api/preferences/user_preferences.dart';
+import 'package:orchid/api/orchid_keys.dart';
+import 'package:orchid/api/orchid_log.dart';
+import 'package:orchid/vpn/preferences/user_preferences_vpn.dart';
 import 'package:orchid/api/orchid_eth/chains.dart';
-import 'package:orchid/pages/circuit/model/orchid_hop.dart';
+import 'package:orchid/vpn/model/orchid_hop.dart';
 
 /// Discovers on-chain and persistently caches accounts for a single signer identity.
 class AccountStore extends ChangeNotifier {
   /// Identity
-  final StoredEthereumKeyRef identity;
+  final EthereumKeyRef identity;
 
   /// If true the account store attempts to find all accounts for the user's
   /// identities.  This involves loading previously cached accounts as well as
@@ -32,13 +30,9 @@ class AccountStore extends ChangeNotifier {
   List<Account> circuitAccounts = [];
 
   AccountStore({
-    @required this.identity,
+    required this.identity,
     this.discoverAccounts = true,
-  }) {
-    if (identity == null) {
-      throw Exception("identity may not be null");
-    }
-  }
+  });
 
   /// All accounts known for the identity, unordered.
   Set<Account> get accounts {
@@ -71,7 +65,7 @@ class AccountStore extends ChangeNotifier {
   // This method can be awaited without potential long delays for network activity.
   void _loadCached() {
     // Load cached previously discovered accounts for this identity
-    var cached = UserPreferences().cachedDiscoveredAccounts.get();
+    var cached = UserPreferencesVPN().cachedDiscoveredAccounts.get() ?? {};
     cachedAccounts = cached
         .where((account) => account.signerKeyUid == identity.keyUid)
         .toList();
@@ -85,17 +79,18 @@ class AccountStore extends ChangeNotifier {
   // Note: a normalized data model for fully user-entered accounts. The Orchid
   // Note: hop configuration is currently where this data resides.
   void _loadFromCircuitConfig() {
-    final circuit = UserPreferences().circuit.get();
-    circuitAccounts = circuit.hops
+    final circuit = UserPreferencesVPN().circuit.get();
+    // circuit will not be null
+    circuitAccounts = circuit!.hops
         .whereType<OrchidHop>()
         .map((hop) => hop.account)
         .where((account) => account.signerKeyUid == identity.keyUid)
         .toList();
 
     // Cache any newly discovered accounts from the hop config
-    var cachedAccounts = UserPreferences().cachedDiscoveredAccounts.get();
+    var cachedAccounts = UserPreferencesVPN().cachedDiscoveredAccounts.get();
     if (!setEquals(circuitAccounts.toSet(), cachedAccounts)) {
-      UserPreferences().addCachedDiscoveredAccounts(circuitAccounts);
+      UserPreferencesVPN().addCachedDiscoveredAccounts(circuitAccounts);
     }
   }
 
@@ -133,7 +128,7 @@ class AccountStore extends ChangeNotifier {
       // Add any newly discovered accounts to the persistent cache
       if (discoveredAccounts.isNotEmpty) {
         logDetail("account_store: Saving discovered accounts: $discoveredAccounts");
-        await UserPreferences().addCachedDiscoveredAccounts(discoveredAccounts);
+        await UserPreferencesVPN().addCachedDiscoveredAccounts(discoveredAccounts);
       }
     }
 
@@ -142,7 +137,7 @@ class AccountStore extends ChangeNotifier {
 
   // discover and add accounts to the discovered accounts list
   Future<void> _discoverV1Accounts(
-      {Chain chain, StoredEthereumKey signer}) async {
+      {required Chain chain, required StoredEthereumKey signer}) async {
     try {
       var found = await OrchidEthereumV1()
           .discoverAccounts(chain: chain, signer: signer);

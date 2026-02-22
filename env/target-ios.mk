@@ -9,6 +9,8 @@
 # }}}
 
 
+cmake := iOS
+
 archs += armv7
 openssl/armv7 := ios-xcrun
 host/armv7 := arm-apple-darwin
@@ -27,11 +29,11 @@ endif
 
 sdk := iphoneos
 runtime := ios
-more := -miphoneos-version-min=11.0
+more := -miphoneos-version-min=13.0
 include $(pwd)/target-apl.mk
 
 support := iPhoneOS
-xcframework := ios-arm64_armv7
+xcframework := ios-arm64
 
 contents := 
 resources := 

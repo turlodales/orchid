@@ -33,37 +33,31 @@
 #include <rtc_base/logging.h>
 #include <system_wrappers/include/field_trial.h>
 
+#include <jinja2cpp/binding/boost_json.h>
+#include <jinja2cpp/reflected_value.h>
+#include <jinja2cpp/template.h>
+#include <jinja2cpp/template_env.h>
+
 #include "baton.hpp"
-#include "binance.hpp"
-#include "boring.hpp"
-#include "chainlink.hpp"
-#include "chart.hpp"
 #include "client0.hpp"
 #include "client1.hpp"
-#include "coinbase.hpp"
 #include "crypto.hpp"
 #include "currency.hpp"
-#include "dns.hpp"
-#include "exchange.hpp"
 #include "float.hpp"
 #include "fiat.hpp"
-#include "huobi.hpp"
+#include "format.hpp"
 #include "jsonrpc.hpp"
-#include "kraken.hpp"
 #include "load.hpp"
 #include "local.hpp"
-#include "markup.hpp"
 #include "network.hpp"
 #include "notation.hpp"
-#include "oracle.hpp"
 #include "pile.hpp"
 #include "remote.hpp"
+#include "sequence.hpp"
 #include "site.hpp"
 #include "sleep.hpp"
 #include "store.hpp"
 #include "time.hpp"
-#include "transport.hpp"
-#include "uniswap.hpp"
 #include "updater.hpp"
 #include "version.hpp"
 
@@ -75,11 +69,12 @@ namespace po = boost::program_options;
 
 struct Global {
     uint64_t benefit_ = 0;
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 }; Locked<Global> global_;
 
 struct Report {
-    Address stakee_;
-    std::optional<Float> cost_;
+    Locator locator_;
+    Float cost_;
     Float speed_;
     Host host_;
     Address recipient_;
@@ -116,37 +111,14 @@ task<std::string> Version(Base &base, const Locator &url) { try {
     co_return version;
 } orc_catch({ co_return ""; }) }
 
-task<Report> TestOpenVPN(const S<Base> &base, std::string ovpn) {
-    (co_await orc_optic)->Name("OpenVPN");
-    co_return co_await Using<BufferSink<Remote>>([&](BufferSink<Remote> &remote) -> task<Report> {
-        co_await Connect(remote, base, remote.Host().operator uint32_t(), std::move(ovpn), "", "");
-        remote.Open();
-        const auto [speed, size] = co_await Measure(remote);
-        const auto host(co_await Find(remote));
-        co_return Report{{}, std::nullopt, speed, host, {}, ""};
-    });
-}
-
-task<Report> TestWireGuard(const S<Base> &base, std::string config) {
-    (co_await orc_optic)->Name("WireGuard");
-    co_return co_await Using<BufferSink<Remote>>([&](BufferSink<Remote> &remote) -> task<Report> {
-        co_await Guard(remote, base, remote.Host().operator uint32_t(), std::move(config));
-        remote.Open();
-        const auto host(co_await Find(remote));
-        const auto [speed, size] = co_await Measure(remote);
-        co_return Report{{}, std::nullopt, speed, host, {}, ""};
-    });
-}
-
-task<Report> TestOrchid(const S<Base> &base, std::string name, const S<Network> &network, const char *address, std::function<task<Client &> (BufferSink<Remote> &)> code) {
-    (co_await orc_optic)->Name(address);
-
-    std::cout << address << " " << name << std::endl;
+task<Report> TestOrchid(const S<Base> &base, const S<Network> &network, const Address &address, std::function<task<Client &> (BufferSink<Remote> &)> code) {
+    const auto name(address.str());
+    (co_await orc_optic)->Name(name.c_str());
 
     co_return co_await Using<BufferSink<Remote>>([&](BufferSink<Remote> &remote) -> task<Report> {
         const auto provider(co_await network->Select("untrusted.orch1d.eth", address));
         Client &client(co_await code(remote));
-        co_await client.Open(provider, base);
+        co_await client.Open(base, provider.locator_, provider.fingerprint_);
         remote.Open();
 
         const auto host(co_await Find(remote));
@@ -159,7 +131,6 @@ task<Report> TestOrchid(const S<Base> &base, std::string name, const S<Network> 
         const auto balance(client.Balance());
 
         const auto benefit(client.Benefit());
-        Log() << "BENEFIT " << std::dec << benefit << " " << name;
         const auto minimum([&]() {
             const auto global(global_());
             if (global->benefit_ == 0 || global->benefit_ > benefit)
@@ -170,15 +141,28 @@ task<Report> TestOrchid(const S<Base> &base, std::string name, const S<Network> 
         const auto recipient(client.Recipient());
         const auto version(co_await Version(*base, provider.locator_));
         const auto cost((spent - balance) / minimum * (1024 * 1024 * 1024));
-        co_return Report{provider.address_, cost, speed, host, recipient, version};
+        co_return Report{provider.locator_, cost, speed, host, recipient, version};
     });
+}
+
+struct Stakee {
+    uint256_t staked_;
+    Address address_;
+    Maybe<std::string> locator_;
+    Maybe<Report> report_;
+};
+
+bool operator <(const Stakee &lhs, const Stakee &rhs) {
+    return lhs.staked_ > rhs.staked_;
 }
 
 struct State {
     uint256_t timestamp_;
     Float speed_;
-    std::map<std::string, Maybe<Report>> providers_;
+
+    uint256_t staked_;
     std::map<Address, Stake> stakes_;
+    std::vector<Stakee> stakees_;
 
     State(uint256_t timestamp) :
         timestamp_(std::move(timestamp))
@@ -186,39 +170,8 @@ struct State {
     }
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 std::shared_ptr<State> state_;
-
-void Print(std::ostream &body, const std::string &name, const Maybe<Report> &maybe) {
-    body << " " << name << ": " << std::string(11 - name.size(), ' ');
-
-    if (const auto error = std::get_if<0>(&maybe)) try {
-        if (*error != nullptr)
-            std::rethrow_exception(*error);
-    } catch (const std::exception &error) {
-        std::string what(error.what());
-        boost::replace_all(what, "\r", "");
-        boost::replace_all(what, "\n", " || ");
-        body << Escape(std::move(what));
-    } else if (const auto report = std::get_if<1>(&maybe)) {
-        body << std::fixed << std::setprecision(4);
-        body << "$";
-        if (report->cost_)
-            body << *report->cost_;
-        else
-            body << "-.----";
-        body << " " << std::setw(8) << report->speed_ << "Mbps   " << report->host_;
-        if (report->recipient_ != Address(0)) {
-            std::ostringstream recipient;
-            recipient << report->recipient_;
-            body << "\n" << std::string(13, ' ') << recipient.str().substr(2);
-        }
-        if (!report->version_.empty())
-            body << "\n" << std::string(13, ' ') << "<a href='https://github.com/OrchidTechnologies/orchid/commit/" << report->version_ << "'>" << report->version_ << "</a>";
-    } else orc_insist(false);
-
-    body << "\n";
-    body << "------------+---------+------------+-----------------\n";
-}
 
 template <typename Type_, typename Value_>
 auto &At(Type_ &&type, const Value_ &value) {
@@ -229,9 +182,6 @@ auto &At(Type_ &&type, const Value_ &value) {
 
 int Main(int argc, const char *const argv[]) {
     std::vector<std::string> chains;
-
-    std::vector<std::string> openvpns;
-    std::vector<std::string> wireguards;
 
     po::variables_map args;
 
@@ -259,12 +209,6 @@ int Main(int argc, const char *const argv[]) {
         ("chain", po::value<std::vector<std::string>>(&chains), "like 1,ETH,https://cloudflare-eth.com/")
     ; options.add(group); }
 
-    { po::options_description group("protocol testing");
-    group.add_options()
-        ("openvpn", po::value(&openvpns))
-        ("wireguard", po::value(&wireguards))
-    ; options.add(group); }
-
     po::store(po::parse_command_line(argc, argv, po::options_description()
         .add(group)
         .add(options)
@@ -279,9 +223,6 @@ int Main(int argc, const char *const argv[]) {
         << std::endl;
         return 0;
     }
-
-    Initialize();
-    //webrtc::field_trial::InitFieldTrialsFromString("WebRTC-DataChannel-Dcsctp/Enabled/");
 
     const unsigned milliseconds(60*1000);
     const S<Base> base(Break<Local>());
@@ -301,45 +242,6 @@ int Main(int argc, const char *const argv[]) {
 
     const auto oracle(Wait(Oracle(milliseconds, ethereum)));
     const auto oxt(Wait(Token::OXT(milliseconds, ethereum)));
-
-    // prices {{{
-    std::map<std::string, S<Updated<std::pair<Float, Float>>>> prices;
-
-    prices.try_emplace("Coinbase", Wait(Opened(Updating(milliseconds, [base]() -> task<std::pair<Float, Float>> {
-        co_return *co_await Parallel(Coinbase(*base, "ETH-USD"), Coinbase(*base, "OXT-USD"));
-    }, "Coinbase"))));
-
-    prices.try_emplace("Binance", Wait(Opened(Updating(milliseconds, [base]() -> task<std::pair<Float, Float>> {
-        co_return *co_await Parallel(Binance(*base, "ETHUSDT"), Binance(*base, "OXTUSDT"));
-    }, "Binance"))));
-
-    prices.try_emplace("Kraken", Wait(Opened(Updating(milliseconds, [base]() -> task<std::pair<Float, Float>> {
-        const auto [eth, oxt] = *co_await Parallel(Kraken(*base, "XETHZUSD"), Kraken(*base, "OXTETH", 1));
-        co_return std::make_tuple(eth, eth * oxt);
-    }, "Kraken"))));
-
-    prices.try_emplace("Huobi", Wait(Opened(Updating(milliseconds, [base]() -> task<std::pair<Float, Float>> {
-        co_return *co_await Parallel(Huobi(*base, "ethusdt"), Huobi(*base, "oxtusdt"));
-    }, "Huobi"))));
-
-    prices.try_emplace("Uniswap2", Wait(Opened(Updating(milliseconds, [ethereum]() -> task<std::pair<Float, Float>> {
-        const auto [eth, oxt] = *co_await Parallel(Uniswap2(*ethereum, Uniswap2USDCETH, Ten6), Uniswap2(*ethereum, Uniswap2OXTETH, 1));
-        co_return std::make_tuple(eth, eth / oxt);
-    }, "Uniswap2"))));
-
-    prices.try_emplace("Uniswap3", Wait(Opened(Updating(milliseconds, [ethereum]() -> task<std::pair<Float, Float>> {
-        const auto [wei, oxt] = *co_await Parallel(Uniswap3(*ethereum, Uniswap3USDCETH, Ten6), Uniswap3(*ethereum, Uniswap3OXTETH, 1));
-        const auto eth(1 / wei / Ten18);
-        co_return std::make_tuple(eth, eth * oxt);
-    }, "Uniswap3"))));
-
-    prices.try_emplace("Chainlink", Wait(Opened(Updating(milliseconds, [ethereum]() -> task<std::pair<Float, Float>> {
-        co_return *co_await Parallel(Chainlink(*ethereum, ChainlinkETHUSD, 0, Ten8 * Ten18), Chainlink(*ethereum, ChainlinkOXTUSD, 0, Ten8 * Ten18));
-    }, "Chainlink"))));
-    // }}}
-
-
-    Exchange exchange(base);
 
 
     const auto account(Wait(Opened(Updating(milliseconds, [ethereum, funder, signer = Address(Derive(secret))]() -> task<std::pair<uint128_t, uint128_t>> {
@@ -363,46 +265,24 @@ int Main(int argc, const char *const argv[]) {
             state->speed_ = 0;
         }
 
-        *co_await Parallel([&]() -> task<void> { try {
-            (co_await orc_optic)->Name("Stakes");
-            state->stakes_ = co_await network->Scan();
-        } catch (...) {
-        } }(), [&]() -> task<void> {
-            (co_await orc_optic)->Name("Tests");
+        state->stakes_ = co_await network->Scan();
 
-            std::vector<std::string> names;
-            std::vector<task<Report>> tests;
+        std::vector<task<Report>> tests;
 
-            for (const auto &openvpn : openvpns) {
-                names.emplace_back("OpenVPN");
-                tests.emplace_back(TestOpenVPN(base, Load(openvpn)));
-            }
+        for (const auto &[provider, stake] : state->stakes_) {
+            state->staked_ += stake.amount_;
+            tests.emplace_back(TestOrchid(base, network, provider, [&](BufferSink<Remote> &remote) -> task<Client &> {
+                co_return co_await Client0::Wire(remote, oracle, oxt, lottery0, secret, funder);
+                //co_return co_await Client1::Wire(remote, oracle, At(markets, 43114), lottery1, secret, funder);
+            }));
+        }
 
-            for (const auto &wireguard : wireguards) {
-                names.emplace_back("WireGuard");
-                tests.emplace_back(TestWireGuard(base, Load(wireguard)));
-            }
+        auto reports(co_await Parallel(std::move(tests)));
+        // XXX: something about the const correctness here is wrong
+        for (const auto &[stake, report] : Zip(state->stakes_, reports))
+            state->stakees_.emplace_back(stake.second.amount_, stake.first, stake.second.url_, std::move(report));
 
-            for (const auto &[provider, name] : (std::pair<const char *, const char *>[]) {
-                {"0x605c12040426ddCc46B4FEAD4b18a30bEd201bD0", "Bloq"},
-                {"0xe675657B3fBbe12748C7A130373B55c898E0Ea34", "BolehVPN"},
-                //{"0xc654a58330b8659399067c309Be93659FbaCbEA6", "Orchid"},
-                {"0x69A4Ed2024bc7056fBA8E18cEfc2c40932B923E3", "PIA"},
-                {"0x2b1ce95573ec1b927a90cb488db113b40eeb064a", "SaurikIT"},
-                {"0x396bea12391ac32c9b12fdb6cffeca055db1d46d", "Tenta"},
-                {"0x40e7cA02BA1672dDB1F90881A89145AC3AC5b569", "VPNSecure"},
-            }) {
-                names.emplace_back(name);
-                tests.emplace_back(TestOrchid(base, name, network, provider, [&](BufferSink<Remote> &remote) -> task<Client &> {
-                    co_return co_await Client0::Wire(remote, oracle, oxt, lottery0, secret, funder);
-                    //co_return co_await Client1::Wire(remote, oracle, At(markets, 43114), lottery1, secret, funder);
-                }));
-            }
-
-            auto reports(co_await Parallel(std::move(tests)));
-            for (unsigned i(0); i != names.size(); ++i)
-                state->providers_[names[i]] = std::move(reports[i]);
-        }());
+        std::sort(state->stakees_.begin(), state->stakees_.end());
 
         std::atomic_store(&state_, state);
         co_await Sleep(1000);
@@ -410,90 +290,51 @@ int Main(int argc, const char *const argv[]) {
 
     Site site;
 
+    jinja2::TemplateEnv env;
+
+    // XXX: in "production", use MemoryFileSystem
+    jinja2::RealFileSystem fs;
+    env.AddFilesystemHandler("", fs);
+
     site(http::verb::get, "/", [&](Request request) -> task<Response> {
         const auto state(std::atomic_load(&state_));
         orc_assert(state);
 
-        Markup markup("Orchid Status");
-        std::ostringstream body;
-
         const auto [balance, escrow] = (*account)();
-        body << "T+" << std::dec << (Timestamp() - state->timestamp_) << "s " << std::fixed << std::setprecision(4) << state->speed_ << "Mbps " <<
-            std::setprecision(1) << (Float(balance) / Ten18) << "/" << (Float(escrow) / Ten18) << "\n";
-        body << "\n";
+        orc_assert(balance != 0);
 
-        for (const auto &[name, price] : prices) {
-            const auto [eth, oxt] = (*price)();
-            body << name << std::string(9 - name.size(), ' ') << ": $" << std::fixed << std::setprecision(3) << (eth * Ten18) << " $" << std::setprecision(5) << (oxt * Ten18);
-            body << "\n";
-        }
-        body << "\n";
+        auto tpl(env.LoadTemplate("source/index.j2").value());
 
-        for (const auto &[name, provider] : state->providers_)
-            Print(body, name, provider);
-        body << "\n";
+        Array providers;
+        for (const auto &stakee : state->stakees_) {
+            Object params;
+            params["stakee"] = stakee.address_.str();
+            params["staked"] = double(stakee.staked_);
 
-        const auto price((*oxt.market_.bid_)());
-        const auto overhead(Float(price) * oxt.market_.currency_.dollars_());
+            try {
+                params["locator"] = *stakee.locator_;
 
-        body << "Cost: ";
-        body << "v0= $" << std::fixed << std::setprecision(2) << (overhead * 83328) << " || ";
-        body << "v1= $" << std::fixed << std::setprecision(2) << (overhead * 66327) << " || ";
-        body << "v2= $" << std::fixed << std::setprecision(2) << (overhead * 300000) << " (ish)";
-        body << "\n";
-
-        body << "      ";
-        body << "rf= $" << std::fixed << std::setprecision(2) << (overhead * 57654) << " || ";
-        body << "1k= $" << std::fixed << std::setprecision(2) << (overhead * 1000) << " || ";
-        body << "$1= " << std::fixed << uint64_t(1 / overhead);
-        body << "\n";
-
-        body << "\n";
-
-        body << price << std::endl;
-        body << "\n";
-
-        body << "\n";
-
-        const auto gas(84000);
-        const auto coefficient((overhead * gas) / (oxt.currency_.dollars_() * Ten18));
-
-        const auto bound((coefficient / ((1-0.80) / 2)).convert_to<float>());
-        const auto zero((coefficient / ((1-0.00) / 2)).convert_to<float>());
-
-        Chart(body, 49, 21, [&](float x) -> float {
-            return x * (bound - zero) + zero;
-        }, [&](float escrow) -> float {
-            return (1 - coefficient / (escrow / 2)).convert_to<float>();
-        }, [&](std::ostream &out, float x) {
-            out << std::fixed << std::setprecision(0) << std::setw(3) << x * 100 << '%';
-        });
-
-        body << "\n";
-
-        for (const auto &[stakee, stake] : state->stakes_) {
-            body << Address(stakee) << " " << std::dec << std::fixed << std::setprecision(3) << std::setw(10) << (Float(stake.amount_) / Ten18) << "\n";
-
-            body << "  ";
-
-            if (const auto error = std::get_if<0>(&stake.url_)) try {
-                std::rethrow_exception(*error);
+                const auto &report(*stakee.report_);
+                params["cost"] = double(report.cost_);
+                params["speed"] = double(report.speed_);
+                params["host"] = std::string(report.host_);
+                params["recipient"] = report.recipient_.str();
+                params["version"] = report.version_;
             } catch (const std::exception &error) {
-                std::string what(error.what());
-                boost::replace_all(what, "\r", "");
-                boost::replace_all(what, "\n", " || ");
-                body << Escape(std::move(what));
-            } else if (const auto url = std::get_if<1>(&stake.url_)) {
-                body << Escape(*url);
-            } else orc_insist(false);
+                params["error"] = error.what();
+            }
 
-            body << "\n";
+            providers.emplace_back(std::move(params));
         }
 
-        markup << body.str();
+        auto body(tpl.RenderAsString({
+            {"staked", double(state->staked_)},
+            {"providers", jinja2::Reflect(Any(providers))},
+        }).value());
+
         co_return Respond(request, http::status::ok, {
             {"content-type", "text/html"},
-        }, markup());
+        }, std::move(body));
     });
 
     const auto median([&]() {
@@ -501,11 +342,11 @@ int Main(int argc, const char *const argv[]) {
         orc_assert(state);
 
         Pile<Float, uint256_t> costs;
-        for (const auto &[name, provider] : state->providers_)
-            if (const auto report = std::get_if<1>(&provider))
-                if (report->cost_ && *report->cost_ != 0)
-                    if (const auto stake(state->stakes_.find(report->stakee_)); stake != state->stakes_.end())
-                        costs(*report->cost_, stake->second.amount_);
+        for (const auto &stakee : state->stakees_)
+            if (const auto report = std::get_if<1>(&stakee.report_))
+                if (report->cost_ != 0)
+                    if (const auto stake(state->stakes_.find(stakee.address_)); stake != state->stakes_.end())
+                        costs(report->cost_, stake->second.amount_);
         return costs.med();
     });
 
@@ -524,6 +365,7 @@ int Main(int argc, const char *const argv[]) {
             {"content-type", "application/json"},
         }, UnparseO(Multi{
             {"jobRunID", Str(Parse(request.body()).at("id"))},
+            // NOLINTNEXTLINE(clang-analyzer-core.StackAddressEscape)
             {"data", Multi{{"price", median().str()}}},
         }));
     });

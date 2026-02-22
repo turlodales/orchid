@@ -1,9 +1,13 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'orchid_log_api.dart';
+import 'orchid_log.dart';
 
 /// Support overriding the platform for testing.
 class OrchidPlatform {
+
+  // PACS feature flag. See also 'no-pacs' localized help text in assets.
+  static bool ENABLE_PACS = true;
+
   // To maintain synchronous operation this value is set on startup and
   // after changing the advanced config (which may override it).
   static bool pretendToBeAndroid = false;
@@ -18,7 +22,8 @@ class OrchidPlatform {
     }
   }
 
-  static bool doesNotSupportScanning = OrchidPlatform.isMacOS ||
+  // TODO: The MobilScanner package does support web but we do not have it set up.
+  static bool doesNotSupportScanning =
       OrchidPlatform.isWeb ||
       OrchidPlatform.isWindows ||
       OrchidPlatform.isLinux;
@@ -78,7 +83,7 @@ class OrchidPlatform {
   }
 
   static bool get hasPurchase {
-    return isApple || isAndroid;
+    return ENABLE_PACS && (isApple || isAndroid);
   }
 
   static String get operatingSystem {

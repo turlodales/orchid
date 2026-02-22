@@ -1,6 +1,5 @@
-// @dart=2.12
 import 'dart:math';
-import 'package:orchid/api/orchid_log_api.dart';
+import 'package:orchid/api/orchid_log.dart';
 
 /// Search over an index to find a series of values which may appear at
 /// irregular intervals.
@@ -133,7 +132,7 @@ class SeriesBinarySearch<T> {
 }
 
 /// Fuzzy date comparison.
-class DateTimeComparable extends Comparable<DateTime> {
+class DateTimeComparable implements Comparable<DateTime> {
   final DateTime date;
   final Duration within;
 

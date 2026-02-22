@@ -6,16 +6,44 @@ sysroot=$1
 distro=$2
 shift 2
 
-name=orchid
-
-docker rm -f "env-${name}" &>/dev/null || true
-docker run -i --name "env-${name}" -v "${PWD}/env:/mnt" ubuntu:"${distro}" /mnt/setup-sys.sh "$@"
+mount=${PWD}/env
 
 rm -rf "${sysroot}"
 mkdir -p "${sysroot}"
 pushd "${sysroot}"
 
-docker export "env-${name}" | fakeroot tar --exclude dev -xmvf-
+# docker does not work inside of docker. proot apt/dpkg only works on Linux
+# XXX: this is only barely deterministic. it doesn't even have a lock file!
+# debootstrap (with --include instead of setup-sys) might be cross-platform
+# or maybe reimplement using multistrap? https://wiki.debian.org/Multistrap
+
+if [[ $(uname -s) = Linux ]]; then
+    # older versions of proot can't handle newer versions of glibc (so build one)
+    # XXX: https://github.com/proot-me/proot/pull/383
+    CFLAGS='-Wno-implicit-function-declaration' \
+    flock "${mount}/proot.lock" "${MAKE:=make}" -C "${mount}/proot/src" PYTHON=false CC=clang
+    proot=${mount}/proot/src/proot
+
+    debootstrap=${mount}/debootstrap
+    # XXX: proot -0 runs the command but fails on exit; fakeroot works correctly
+    DEBOOTSTRAP_DIR=${debootstrap} fakeroot "${debootstrap}"/debootstrap --foreign --variant=minbase --arch amd64 --components=main,universe "${distro}" .
+
+    cp -af "${mount}/path/ubuntu-distro-info" usr/bin
+    "${proot}" -0 -r . -w / -b /sys /debootstrap/debootstrap --second-stage
+
+    # XXX: https://groups.google.com/g/linux.debian.bugs.dist/c/-p06sQmwamA
+    echo "deb http://archive.ubuntu.com/ubuntu/ ${distro}-updates main universe" >>etc/apt/sources.list
+    HOME= "${proot}" -S . -w / -b "${mount}:/mnt" /mnt/setup-sys.sh "$@"
+else
+    tarball=${PWD}/export.tgz
+    clean() { rm -f "${tarball}"; }
+    trap clean EXIT
+
+    ${ENV_DOCKER:=docker} run --platform linux/amd64 -i --rm \
+        -v "${mount}:/mnt" -v "${PWD}:/tmp/export" \
+        ubuntu:"${distro}" /mnt/export.sh /tmp/export/export.tgz /mnt/setup-sys.sh "$@"
+    tar --exclude dev -vxzmf "${tarball}"
+fi
 
 popd
 env/relink.sh "${sysroot}"

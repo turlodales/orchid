@@ -1,12 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:orchid/api/orchid_eth/token_type.dart';
 import 'package:orchid/api/orchid_eth/tokens.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:orchid/api/orchid_log_api.dart';
+import 'package:orchid/api/orchid_log.dart';
 import 'package:orchid/util/cacheable.dart';
-import 'package:orchid/util/units.dart';
-
-import '../orchid_platform.dart';
+import 'package:orchid/api/pricing/usd.dart';
 
 /// Token Exchange rates
 class OrchidPricing {
@@ -23,13 +20,13 @@ class OrchidPricing {
 
   /// The USD value of the token quantity.
   Future<USD> tokenToUSD(Token token) async {
-    return USD(token.floatValue * await tokenToUsdRate(token.type));
+    return USD(token.doubleValue * await tokenToUsdRate(token.type));
   }
 
   /// Convert value of from token to equivalant USD value in 'to' token type.
   Future<Token> tokenToToken(Token fromToken, TokenType toType) async {
     return toType.fromDouble(
-        fromToken.floatValue * await tokenToTokenRate(fromToken.type, toType));
+        fromToken.doubleValue * await tokenToTokenRate(fromToken.type, toType));
   }
 
   /// (toType / fromType): The conversion rate from fromType to toType
@@ -46,14 +43,14 @@ class OrchidPricing {
 
   /// (USD/Token): Tokens * Rate = USD
   Future<double> tokenToUsdRate(TokenType tokenType) async {
-    if (tokenType.exchangeRateSource == Tokens.NoExchangeRateSource) {
+    if (tokenType.exchangeRateSource == null) {
       throw Exception('No exchange rate source for token: ${tokenType.symbol}');
     }
 
     return cache.get(
         key: tokenType,
         producer: (tokenType) {
-          return tokenType.exchangeRateSource.tokenToUsdRate(tokenType);
+          return tokenType.exchangeRateSource!.tokenToUsdRate(tokenType);
         });
   }
 
@@ -65,17 +62,24 @@ class OrchidPricing {
     }
     return 1.0 / rate;
   }
+
+  static logTokenPrices() async {
+    String out = "Token Prices:\n";
+    for (var token in Tokens.all) {
+      out += "${token.symbol}:  \$${await token.exchangeRateSource?.tokenToUsdRate(token)}\n";
+    }
+    log(out);
+  }
 }
 
 abstract class ExchangeRateSource {
-  final String symbolOverride;
-
-  const ExchangeRateSource({this.symbolOverride});
+  const ExchangeRateSource();
 
   /// Return the price (USD/Token): tokens * Rate = USD
   Future<double> tokenToUsdRate(TokenType tokenType);
 
-  Future<double> _invert(double rate) async {
+  @protected
+  Future<double> invert(double rate) async {
     if (rate == 0) {
       throw Exception("invalid rate: $rate");
     }
@@ -83,49 +87,15 @@ abstract class ExchangeRateSource {
   }
 }
 
-class BinanceExchangeRateSource extends ExchangeRateSource {
-  /// A Binance lookup is normally <TOKEN>USDT:
-  /// https://api.binance.com/api/v3/avgPrice?symbol=ETHUSDT
-  ///
-  /// This flag reverses the pair ordering to USDT<TOKEN> and inverts
-  /// the rate consistent with that. e.g. for DAI we must use 1/USDTDAI and
-  /// not DAIUSDT since DAIUSDT was delisted.
-  final bool inverted;
+class FixedPriceToken extends ExchangeRateSource {
+  final USD usdPrice;
 
-  const BinanceExchangeRateSource(
-      {this.inverted = false, String symbolOverride})
-      : super(symbolOverride: symbolOverride); // Binance exchange rates
+  static const zero = const FixedPriceToken(USD.zero);
 
-  // https://api.binance.com/api/v3/avgPrice?symbol=ETHUSDT
-  String _url(TokenType tokenType) {
-    var symbol = symbolOverride ?? tokenType.symbol.toUpperCase();
-    var pair = inverted ? 'USDT$symbol' : '${symbol}USDT';
-    return 'https://api.binance.com/api/v3/avgPrice?symbol=$pair';
-  }
+  const FixedPriceToken(this.usdPrice);
 
-  /// Return the price, USD/Token: Tokens * Rate = USD
+  @override
   Future<double> tokenToUsdRate(TokenType tokenType) async {
-    var rate = await _getPrice(tokenType);
-    return inverted ? _invert(rate) : rate;
-  }
-
-  Future<double> _getPrice(TokenType tokenType) async {
-    logDetail("pricing: Binance fetching rate for: $tokenType");
-    try {
-      var response = await http.get(
-        Uri.parse(_url(tokenType)),
-        headers: OrchidPlatform.isWeb
-            ? {}
-            : {'Referer': 'https://account.orchid.com'},
-      );
-      if (response.statusCode != 200) {
-        throw Exception("Error status code: ${response.statusCode}");
-      }
-      var body = json.decode(response.body);
-      return double.parse(body['price']);
-    } catch (err) {
-      log("Error fetching pricing: $err");
-      throw err;
-    }
+    return usdPrice.value;
   }
 }

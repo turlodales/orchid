@@ -1,12 +1,12 @@
 buildscript {
-    ext.kotlin_version = '1.3.61'
+    ext.kotlin_version = '2.2.20'
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.1.2'
+        classpath 'com.android.tools.build:gradle:8.9.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
@@ -14,7 +14,7 @@ buildscript {
 allprojects {
     repositories {
         google()
-        jcenter()
+        mavenCentral()
     }
 }
 
@@ -27,42 +27,36 @@ subprojects {
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
-def flutter = files(orcFlutter)
+def flutterFile = files(orcFlutter)
+
+ext {
+    flutter = [compileSdkVersion: 36]
+}
 
 android {
-    compileSdkVersion 30
+    namespace "net.orchid.Orchid"
+    compileSdkVersion flutter.compileSdkVersion
 
     defaultConfig {
         applicationId orcUnique
-        minSdkVersion 21
-        targetSdkVersion 31
+        minSdkVersion 24
+        targetSdkVersion 34
         versionCode orcMonotonic.toInteger() - 946684800
         versionName orcVersion
         manifestPlaceholders = [orcUnique: orcUnique, orcName: orcName]
     }
 
-    signingConfigs {
-        orchid {
-            keyAlias orcAlias
-            keyPassword orcPassword
-            storeFile file(orcStore)
-            storePassword orcPassword
-        }
-    }
-
-    buildTypes {
-        debug {
-            signingConfig signingConfigs.orchid
-        }
-
-        release {
-            signingConfig signingConfigs.orchid
-        }
-    }
-
     compileOptions {
         sourceCompatibility 1.8
         targetCompatibility 1.8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     sourceSets {
@@ -75,13 +69,18 @@ android {
     }
 
     dependencies {
-        implementation flutter
+        implementation flutterFile
         implementation "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
 
-        // https://github.com/flutter/flutter/issues/76183
-        // this library is now used by a35e3fe4a34b94a9b624f56e81ad4ff040230a40
-        // but, flutter fails to add a dependency to ensure it gets embedded :/
-        implementation "androidx.activity:activity:1.0.0"
+        implementation "androidx.activity:activity:1.8.1"
+        implementation "androidx.core:core:1.13.1"
+        implementation "androidx.lifecycle:lifecycle-common:2.7.0"
+        implementation "androidx.lifecycle:lifecycle-extensions:2.2.0"
+        implementation "androidx.tracing:tracing:1.2.0"
+        implementation "androidx.window:window:1.2.0"
+        implementation "androidx.window:window-java:1.2.0"
+
+        implementation "com.getkeepsafe.relinker:relinker:1.4.5"
     }
 
     lintOptions {
@@ -93,7 +92,7 @@ android {
 }
 
 import groovy.json.JsonSlurper
-def plugins = new JsonSlurper().parseText(new File(orcInterface + "/.flutter-plugins-dependencies").text)
+def plugins = new JsonSlurper().parseText(file(orcInterface + "/.flutter-plugins-dependencies").text)
 plugins.plugins.android.each { dependency ->
     def plugin = project.rootProject.findProject(":${dependency.name}")
 
@@ -102,17 +101,19 @@ plugins.plugins.android.each { dependency ->
     }
 
     plugin.afterEvaluate {
+        plugin.android { compileSdkVersion flutter.compileSdkVersion }
+
         plugin.android.buildTypes {
             profile {
                 initWith debug
             }
         }
         plugin.dependencies {
-            compileOnly flutter
+            compileOnly flutterFile
 
-            // https://github.com/flutter/flutter/issues/56686
-            // WakelockPlugin.kt: Unresolved reference: NonNull
             implementation "androidx.annotation:annotation:1.0.0"
+            implementation "com.android.support:support-annotations:28.0.0"
+            implementation "org.jetbrains:annotations:24.0.1"
         }
     }
 }

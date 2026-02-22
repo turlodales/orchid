@@ -1,11 +1,14 @@
-import 'package:orchid/orchid.dart';
+import 'package:orchid/orchid/orchid.dart';
 import 'package:orchid/api/orchid_eth/orchid_account_mock.dart';
-import 'package:orchid/util/test_app.dart';
+import 'package:orchid/orchid/test_app.dart';
 import 'account_card.dart';
-import 'account_detail_poller.dart';
+import '../../api/orchid_eth/orchid_account_detail.dart';
 
-void main() {
-  runApp(TestApp(scale: 1.0, content: _Test()));
+// Note: This redundant import of material is required in the main dart file.
+import 'package:flutter/material.dart';
+
+void main() async {
+  TestApp.run(scale: 1.0, content: _Test());
 }
 
 class _Test extends StatefulWidget {
@@ -14,7 +17,7 @@ class _Test extends StatefulWidget {
 }
 
 class _TestState extends State<_Test> {
-  AccountDetail account;
+  late AccountDetail account;
   bool active1 = true;
 
   @override

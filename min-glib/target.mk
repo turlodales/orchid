@@ -12,7 +12,6 @@
 # glib {{{
 w_glib := 
 w_glib += -Dlibmount=disabled
-w_glib += -Diconv=external
 
 m_glib := 
 
@@ -29,6 +28,8 @@ endif
 temp := $(patsubst %,$(pwd)/glib/%,$(glib))
 
 $(call depend,$(pwd)/glib/build.ninja,@/usr/include/iconv.h @/usr/lib/libiconv.a)
+$(call depend,$(pwd)/glib/build.ninja,@/usr/include/pcre2.h @/usr/lib/libpcre2-8.a)
+
 $(call depend,$(pwd)/glib/glib/glibconfig.h,@/$(pwd)/glib/build.ninja)
 
 $(subst @,%,$(patsubst %,$(output)/@/%,$(temp))): $(output)/%/$(pwd)/glib/build.ninja
@@ -36,15 +37,15 @@ $(subst @,%,$(patsubst %,$(output)/@/%,$(temp))): $(output)/%/$(pwd)/glib/build.
 
 linked += $(temp)
 
-header += @/$(pwd)/glib/build.ninja
+header += @/$(pwd)/glib/glib/libglib-2.0.a
+
+cflags += -I@/$(pwd)/glib
 cflags += -I@/$(pwd)/glib/glib
 
 cflags += -I$(pwd)/glib
 cflags += -I$(pwd)/glib/glib
-cflags += -I$(pwd)/glib/gmodule
 
-#cflags += -I@/$(pwd)/glib
-#glib += gio/libgio-2.0.a
+cflags += -I$(pwd)/glib/gmodule
 # }}}
 # libiconv {{{
 export GNULIB_SRCDIR := $(CURDIR)/$(pwd)/gnulib
@@ -59,3 +60,6 @@ $(output)/$(1)/usr/include/%.h $(output)/$(1)/usr/lib/lib%.a: $(output)/$(1)/$(p
 endef
 $(each)
 # }}}
+
+$(call include,pcr/target.mk)
+$(call include,zlb/target.mk)

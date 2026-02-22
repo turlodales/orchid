@@ -32,10 +32,11 @@ args += --chain 10,ETH,https://mainnet.optimism.io/
 args += --chain 30,BTC,https://public-node.rsk.co/
 #args += --chain 40,TLOS,https://mainnet.telos.net/evm
 args += --chain 56,BNB,https://bsc-dataseed.binance.org/
-args += --chain 100,DAI,https://rpc.xdaichain.com/
+args += --chain 100,DAI,https://rpc.gnosischain.com/
 args += --chain 137,MATIC,https://polygon-rpc.com/
 #args += --chain 200,DAI,https://arbitrum.xdaichain.com/
 args += --chain 250,FTM,https://rpc.ftm.tools/
+args += --chain 8453,ETH,https://mainnet.base.org/
 #args += --chain 42161,ETH,https://arb1.arbitrum.io/rpc
 # https://github.com/celo-org/celo-blockchain/issues/1734
 # https://github.com/celo-org/celo-blockchain/issues/1737

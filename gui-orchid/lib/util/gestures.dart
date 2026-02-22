@@ -6,21 +6,21 @@ class TripleTapGestureDetector extends StatelessWidget {
   final maxInterval = 300;
 
   const TripleTapGestureDetector({
-    Key key,
-    this.child,
-    this.onTripleTap,
+    Key? key,
+    required this.child,
+    required this.onTripleTap,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    DateTime lastTap;
+    DateTime? lastTap;
     int count = 0;
 
     return GestureDetector(
       onTap: () {
         var now = DateTime.now();
         if (lastTap == null ||
-            now.difference(lastTap).inMilliseconds < maxInterval) {
+            now.difference(lastTap!).inMilliseconds < maxInterval) {
           count++;
           if (count >= 3) {
             count = 0;

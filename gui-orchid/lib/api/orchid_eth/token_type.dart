@@ -4,7 +4,8 @@ import 'package:flutter_svg/svg.dart';
 import 'package:orchid/api/pricing/orchid_pricing.dart';
 import '../orchid_crypto.dart';
 import 'chains.dart';
-import 'package:orchid/util/units.dart' as units;
+import 'package:orchid/util/format_decimal.dart' as units;
+import 'package:decimal/decimal.dart';
 
 // Token type
 // Note: Unfortunately Dart does not have a polyomorphic 'this' type so the
@@ -15,11 +16,14 @@ class TokenType {
   final int chainId;
   final String symbol;
   final int decimals;
-  final ExchangeRateSource exchangeRateSource;
+  final ExchangeRateSource? exchangeRateSource;
   final String iconPath;
 
+  /// The symbol name to be used in the Orchid config for the back-end.
+  final String? configSymbolOverride;
+
   /// The ERC20 contract address if this is a non-native token on its chain.
-  final EthereumAddress erc20Address;
+  final EthereumAddress? erc20Address;
 
   /// Returns true if this token is the native (gas) token on its chain.
   bool get isNative {
@@ -35,17 +39,19 @@ class TokenType {
   }
 
   const TokenType({
-    @required this.chainId,
-    @required this.symbol,
+    required this.chainId,
+    required this.symbol,
+    this.configSymbolOverride,
     this.exchangeRateSource,
     this.decimals = 18,
     this.erc20Address,
-    @required this.iconPath,
+    required this.iconPath,
   });
 
-  // Return 1eN where N is the decimal count.
+  // Return 1eN where N is the 'decimals' value.
+  // (Note that Dart int can handle up to 2^53-1 on JS and 2^64-1 elsewhere.)
   int get multiplier {
-    return Math.pow(10, this.decimals);
+    return Math.pow(10, this.decimals).toInt();
   }
 
   // From the integer denomination value e.g. WEI for ETH
@@ -66,6 +72,11 @@ class TokenType {
     // Note: No explicit rounding needed here because BigInt converts for us
     // Note: and round() on the double would overflow Dart's native int.
     return fromInt(BigInt.from(val * this.multiplier));
+  }
+
+  // From a number representing the nominal token denomination, e.g. 1.0 OXT
+  Token fromDecimal(Decimal val) {
+    return fromInt((val * Decimal.fromInt(this.multiplier)).toBigInt());
   }
 
   @override
@@ -93,21 +104,48 @@ class Token {
   Token(this.type,
       this.intValue); // The float value in nominal units (e.g. ETH, OXT)
 
-  double get floatValue {
+  double get doubleValue {
     return intValue.toDouble() / type.multiplier;
   }
 
+  Decimal get decimalValue {
+    return Decimal.fromBigInt(intValue).shift(-type.decimals);
+  }
+
   /// No token symbol
-  String toFixedLocalized({@required Locale locale, int digits = 4}) {
-    return units.formatCurrency(floatValue, locale: locale, digits: digits);
+  String toFixedLocalized({
+    required Locale locale,
+    int precision = 4,
+    int? maxPrecision,
+    int? minPrecision,
+    bool showPrecisionIndicator = false,
+  }) {
+    return units.formatDecimal(
+      decimalValue,
+      locale: locale,
+      minPrecision: minPrecision,
+      maxPrecision: maxPrecision,
+      showPrecisionIndicator: showPrecisionIndicator,
+      precision: precision,
+    );
   }
 
   /// Format as value with the symbol suffixed
-  String formatCurrency(
-      {@required Locale locale, int digits = 4, bool showSuffix = true}) {
-    return units.formatCurrency(floatValue,
+  String formatCurrency({
+    required Locale locale,
+    int precision = 4,
+    bool showSuffix = true,
+    int? maxPrecision,
+    int? minPrecision,
+    bool showPrecisionIndicator = false,
+  }) {
+    // print("XXX: format decimal value: $decimalValue");
+    return units.formatDecimal(decimalValue,
         locale: locale,
-        digits: digits,
+        precision: precision,
+        minPrecision: minPrecision,
+        maxPrecision: maxPrecision,
+        showPrecisionIndicator: showPrecisionIndicator,
         suffix: showSuffix ? type.symbol : null);
   }
 
@@ -195,7 +233,7 @@ class Token {
 
   void assertType(TokenType type) {
     if (this.type != type) {
-      throw AssertionError('Token ${this} is not ${type}');
+      throw AssertionError('Token $this is not $type');
     }
   }
 
@@ -234,6 +272,7 @@ class Token {
 
   @override
   String toString() {
-    return 'Token{type: ${type.symbol}, floatValue: $floatValue}';
+    return 'Token{type: ${type.symbol}, doubleValue: $doubleValue}';
   }
 }
+

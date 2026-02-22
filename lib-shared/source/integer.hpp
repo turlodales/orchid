@@ -1,0 +1,71 @@
+/* Orchid - WebRTC P2P VPN Market (on Ethereum)
+ * Copyright (C) 2017-2020  The Orchid Authors
+*/
+
+/* GNU Affero General Public License, Version 3 {{{ */
+/*
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+**/
+/* }}} */
+
+
+#ifndef ORCHID_INTEGER_HPP
+#define ORCHID_INTEGER_HPP
+
+#include <charconv>
+#include <string>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wconversion"
+#include <boost/multiprecision/cpp_int.hpp>
+#pragma clang diagnostic pop
+
+#include "error.hpp"
+
+namespace orc {
+
+template <unsigned Bits_>
+using uint_t = boost::multiprecision::number<boost::multiprecision::backends::cpp_int_backend<Bits_, Bits_, boost::multiprecision::unsigned_magnitude, boost::multiprecision::unchecked>>;
+
+using boost::multiprecision::uint128_t;
+using boost::multiprecision::uint256_t;
+
+static const uint128_t Max128((uint256_t(1) << 128) - 1);
+
+// XXX: remove this once I upgrade libc++
+inline bool Compare(const std::from_chars_result &lhs, const std::from_chars_result &rhs) {
+    return lhs.ptr == rhs.ptr && lhs.ec == rhs.ec;
+}
+
+template <typename Type_>
+std::enable_if_t<std::is_integral_v<Type_>, Type_> To(const std::string_view &value, int base = 0) {
+    auto start(value.data());
+    const auto size(value.size());
+    const auto end(start + size);
+    const auto detected([&]() -> int {
+        if (base != 0)
+            return base;
+        if (size < 2 || start[0] != '0' || start[1] != 'x')
+            return 10;
+        start += 2;
+        return 16;
+    }());
+    Type_ number;
+    orc_assert_(Compare(std::from_chars(start, end, number, detected), std::from_chars_result{end, std::errc()}), value << " is not a number");
+    return number;
+}
+
+}
+
+#endif//ORCHID_INTEGER_HPP

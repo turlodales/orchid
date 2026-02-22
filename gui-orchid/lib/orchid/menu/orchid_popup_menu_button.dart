@@ -1,37 +1,41 @@
-import 'package:orchid/orchid.dart';
+import 'package:orchid/orchid/orchid.dart';
 
 /// Rounded rect popup menu button with the Orchid theme including a selected state.
 class OrchidPopupMenuButton<T> extends StatelessWidget {
-  final PopupMenuItemSelected<T> onSelected;
-  final PopupMenuCanceled onCanceled;
+  final PopupMenuItemSelected<T>? onSelected;
+  final PopupMenuCanceled? onCanceled;
   final PopupMenuItemBuilder<T> itemBuilder;
-  final Widget child;
+  final Widget? child;
   final bool selected;
-  final double width, height;
+  final double? width, height;
   final bool showBorder;
-  final Offset offset;
+  final Offset? offset;
+  final Color? backgroundColor;
 
   // When true the button shows a disabled appearance (but continues to trigger the menu).
   final bool disabledAppearance;
+  final bool enabled;
 
   const OrchidPopupMenuButton({
-    Key key,
-    @required this.itemBuilder,
-    @required this.selected,
+    Key? key,
+    required this.itemBuilder,
+    required this.selected,
     this.onSelected,
     this.onCanceled,
     this.child,
     this.width,
-    this.height,
+    required this.height,
     this.showBorder = false,
     this.offset,
+    this.enabled = true,
     this.disabledAppearance = false,
+    this.backgroundColor,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    var buttonColor =
-        selected ? OrchidColors.new_purple_divider : OrchidColors.new_purple;
+    var buttonColor = backgroundColor ??
+        (selected ? OrchidColors.new_purple_divider : OrchidColors.new_purple);
     buttonColor = disabledAppearance ? OrchidColors.disabled : buttonColor;
     return Container(
       width: width,
@@ -52,6 +56,7 @@ class OrchidPopupMenuButton<T> extends StatelessWidget {
           highlightColor: Colors.transparent,
         ),
         child: PopupMenuButton<T>(
+          enabled: enabled,
           padding: EdgeInsets.zero,
           offset: offset ?? Offset(0, 40.0 + 12.0),
           // The color of the dropdown menu item background

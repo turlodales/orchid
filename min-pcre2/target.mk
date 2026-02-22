@@ -12,25 +12,13 @@
 pwd/pcre2 := $(pwd)/pcre2
 
 cflags += -DPCRE2_CODE_UNIT_WIDTH=8
-cflags += -I$(pwd)/extra
+cflags += -DPCRE2_STATIC
 
-cflags/$(pwd)/ += -include $(pwd/pcre2)/src/config.h.generic
+define _
+$(output)/$(1)/usr/include/%.h $(output)/$(1)/usr/lib/lib%-8.a: $(output)/$(1)/$(pwd)/%/Makefile $(sysroot)
+	$$(MAKE) -C $$(dir $$<) install-nodist_includeHEADERS install-includeHEADERS install-libLTLIBRARIES install-pkgconfigDATA
+endef
+$(each)
 
-source += $(pwd)/pcre2_chartables.c
-cflags/$(pwd)/pcre2_chartables.c += -I$(pwd/pcre2)/src
-
-source += $(pwd/pcre2)/src/pcre2_auto_possess.c
-source += $(pwd/pcre2)/src/pcre2_compile.c
-source += $(pwd/pcre2)/src/pcre2_context.c
-source += $(pwd/pcre2)/src/pcre2_error.c
-source += $(pwd/pcre2)/src/pcre2_find_bracket.c
-source += $(pwd/pcre2)/src/pcre2_jit_compile.c
-source += $(pwd/pcre2)/src/pcre2_match.c
-source += $(pwd/pcre2)/src/pcre2_match_data.c
-source += $(pwd/pcre2)/src/pcre2_newline.c
-source += $(pwd/pcre2)/src/pcre2_script_run.c
-source += $(pwd/pcre2)/src/pcre2_string_utils.c
-source += $(pwd/pcre2)/src/pcre2_study.c
-source += $(pwd/pcre2)/src/pcre2_tables.c
-source += $(pwd/pcre2)/src/pcre2_ucd.c
-source += $(pwd/pcre2)/src/pcre2_valid_utf.c
+header += @/usr/include/pcre2.h
+linked += usr/lib/libpcre2-8.a

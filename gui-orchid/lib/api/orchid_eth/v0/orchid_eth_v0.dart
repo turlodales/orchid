@@ -1,14 +1,14 @@
-import 'package:flutter/foundation.dart';
-import 'package:orchid/api/configuration/orchid_user_config/orchid_user_param.dart';
+import 'package:orchid/api/orchid_keys.dart';
+import 'package:orchid/api/orchid_user_config/orchid_user_param.dart';
 import 'package:orchid/api/orchid_eth/eth_rpc.dart';
-import 'package:orchid/api/orchid_log_api.dart';
+import 'package:orchid/api/orchid_eth/tokens_legacy.dart';
+import 'package:orchid/api/orchid_log.dart';
 import 'package:orchid/api/orchid_eth/chains.dart';
 import 'package:orchid/util/hex.dart';
-import 'package:orchid/util/units.dart';
 
 import '../abi_encode.dart';
 import '../orchid_account.dart';
-import '../../orchid_budget_api.dart';
+import '../orchid_lottery.dart';
 import '../../orchid_crypto.dart';
 import 'orchid_contract_v0.dart';
 
@@ -83,8 +83,8 @@ class OrchidEthereumV0 {
   /// Get Orchid transactions associated with Update events that affect the balance.
   /// Transactions are returned in date order.
   Future<List<OrchidUpdateTransactionV0>> getUpdateTransactions({
-    EthereumAddress funder,
-    EthereumAddress signer,
+    required EthereumAddress funder,
+    required EthereumAddress signer,
   }) async {
     List<OrchidUpdateEventV0> events = await getUpdateEvents(funder, signer);
     List<OrchidUpdateTransactionV0> transactions =
@@ -182,12 +182,13 @@ class OrchidEthereumV0 {
     return events;
   }
 
-  Future<List<Account>> discoverAccounts({StoredEthereumKey signer}) async {
+  Future<List<Account>> discoverAccounts(
+      {required StoredEthereumKey signer}) async {
     // Discover accounts for the active identity on V0 Ethereum.
     List<OrchidCreateEventV0> v0CreateEvents =
         await OrchidEthereumV0().getCreateEvents(signer.address);
     return v0CreateEvents.map((event) {
-      return Account.fromSignerKey(
+      return Account.fromSignerKeyRef(
           signerKey: signer.ref(),
           chainId: Chains.ETH_CHAINID,
           funder: event.funder);
@@ -195,7 +196,7 @@ class OrchidEthereumV0 {
   }
 
   static Future<dynamic> _jsonRpc({
-    @required String method,
+    required String method,
     List<Object> params = const [],
   }) async {
     return EthereumJsonRpc.ethJsonRpcCall(

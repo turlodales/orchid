@@ -15,6 +15,7 @@ lib := a
 exe := 
 
 meson := linux
+cmake += Android
 
 archs += armeabi-v7a
 openssl/armeabi-v7a := android-arm
@@ -48,19 +49,16 @@ endif
 
 include $(pwd)/target-elf.mk
 
-aver := 21
+aver := 24
 
 ifeq ($(uname-o),Android)
 
-cc := clang
-cxx := clang++
+include $(pwd)/kit-default.mk
 
 openssl/arm64-v8a := linux-aarch64
 
 define _
 more/$(1) := 
-ranlib/$(1) := ranlib
-ar/$(1) := ar
 strip/$(1) := strip
 windres/$(1) := false
 endef
@@ -70,11 +68,9 @@ else
 
 more = --sysroot=$(llvm)/sysroot
 # https://github.com/android-ndk/ndk/issues/884
+# XXX: wait, but don't I want this? look again!
 more += -fno-addrsig
-include $(pwd)/target-ndk.mk
-
-cxx += -stdlib=libc++
-lflags += -static-libstdc++
+include $(pwd)/kit-android.mk
 
 define _
 temp := $(subst -,$(space),$(host/$(1)))
@@ -82,8 +78,6 @@ arch := $$(word 1,$$(temp))
 temp := $$(subst $$(space),-,$$(wordlist 2,3,$$(temp)))
 more/$(1) := -target $$(arch)-unknown-$$(temp)$(aver)
 temp := $(word 1,$(meson/$(1)))-$$(temp)
-ranlib/$(1) := $(llvm)/bin/llvm-ranlib
-ar/$(1) := $(llvm)/bin/llvm-ar
 strip/$(1) := $(llvm)/bin/$$(temp)-strip
 windres/$(1) := false
 endef
@@ -91,6 +85,11 @@ $(each)
 
 endif
 
+include $(pwd)/target-cxx.mk
+lflags += -lc++abi
+
 lflags += -lm -llog
 
 wflags += -L$(CURDIR)/env/android
+
+source += env/android.cpp

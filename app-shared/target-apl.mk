@@ -21,6 +21,8 @@
 include shared/target-all.mk
 engine := $(pwd/flutter)/bin/cache/artifacts/engine/$(platform)$(engine)
 
+toolchain := $(shell xcode-select -p)/Toolchains/XcodeDefault.xctoolchain
+
 ifeq ($(filter ldid,$(debug)),)
 unlock := $(if $(keychain),security unlock-keychain -p $(word 2,$(keychain)) $(word 1,$(keychain)) &&)
 codesign = xattr -cr $(1) && $(unlock) codesign -vfs $(identity) --entitlements $(2) --generate-entitlement-der $(1)
@@ -35,13 +37,8 @@ endif
 
 codesign += && touch $(3)
 
-ifeq ($(target),mac)
-cflags += -F$(engine)
-lflags += -F$(engine)
-else
 cflags += -F$(engine)/$(framework).xcframework/$(xcframework)
 lflags += -F$(engine)/$(framework).xcframework/$(xcframework)
-endif
 
 app := $(bundle)$(contents)/Frameworks/App.framework
 embed := $(bundle)$(contents)/Frameworks/$(framework).framework
@@ -50,28 +47,29 @@ ifeq ($(target),mac)
 temp := 
 else
 temp := $(pwd/gui)/ios/Flutter/AppFrameworkInfo.plist
-$(temp): $(pwd/flutter)/packages/flutter_tools/templates/app_shared/ios.tmpl/Flutter/AppFrameworkInfo.plist
+$(temp): $(pwd/flutter)/packages/flutter_tools/templates/app/ios.tmpl/Flutter/AppFrameworkInfo.plist
 	mkdir -p $(dir $@)
 	cp -f $< $@
 endif
 
-rsync := rsync -a --delete $(patsubst %,--filter "- %",.DS_Store _CodeSignature Headers Modules)
+rsync := rsync -a --chmod=+rX --delete $(patsubst %,--filter "- %",.DS_Store _CodeSignature Headers Modules)
 
 $(app)$(versions)$(resources)/Info%plist $(embed)$(versions)$(resources)/Info%plist: $(dart) $(temp)
 	rm -rf .dart_tool/flutter_build $(output)/flutter
-	cd $(pwd/gui) && $(flutter) assemble \
+	cd $(pwd/gui) && MACOSX_DEPLOYMENT_TARGET=10.15 $(flutter) assemble \
+	    -dAction="build" \
 	    -dTargetPlatform="$(platform)" \
 	    -dTargetFile="lib/main.dart" \
 	    -dSdkRoot="$(isysroot)" \
 	    -dBuildMode="$(mode)" \
-	    -dIosArchs="$(machine)" \
+	    -d$(capped)Archs="$(machine)" \
 	    -dTreeShakeIcons="false" \
-	    -dTrackWidgetCreation="" \
+	    -dTrackWidgetCreation="true" \
 	    -dDartObfuscation="false" \
 	    -dSplitDebugInfo="" \
-	    -dEnableBitcode="" \
-	    -dDartDefines="" \
-	    -dExtraFrontEndOptions="" \
+	    --DartDefines="" \
+	    --ExtraGenSnapshotOptions="" \
+	    --ExtraFrontEndOptions="" \
 	    --output="$(CURDIR)/$(output)/flutter" \
 	    $(mode)_$(assemble)_bundle_flutter_assets
 	@mkdir -p $(dir $(app)) $(dir $(embed))
@@ -80,11 +78,9 @@ ifeq ($(target),mac)
 else
 	$(rsync) --filter '- $(framework)' $(engine)/$(framework).xcframework/$(xcframework)/Flutter.framework $(dir $(embed))
 	xcrun bitcode_strip -r $(engine)/$(framework).xcframework/$(xcframework)/Flutter.framework/Flutter -o $(embed)/$(framework)
-ifeq ($(target),ios)
-	lipo $(patsubst %,-extract %,$(archs)) $(embed)/$(framework) -output $(embed)/$(framework)
-endif
 endif
 	$(rsync) $(output)/flutter/App.framework $(dir $(app))
+	find $(app) ! -perm 755 -a ! -perm 644 -exec chmod -v 644 {} +
 	touch $(patsubst %,%$(versions)$(resources)/Info.plist,$(app) $(embed))
 
 signed += $(app)$(versions)$(signature)
@@ -97,10 +93,9 @@ $(embed)$(versions)$(signature): shared/empty.plist $(embed)$(versions)$(resourc
 	@rm -rf $(dir $@)
 	$(call codesign,$(embed),$<,$@)
 
+cflags += -I$(pwd/gui)/$(assemble)/Pods/Headers/Public{,/in_app_purchase_storekit} # XXX: generalize 
 
-cflags += -I$(pwd/gui)/$(assemble)/Pods/Headers/Public
-
-$(pwd/gui)/$(assemble)/Pods/Manifest.lock: $(pwd/gui)/$(assemble)/Podfile $(pwd/gui)/.flutter-plugins
+$(pwd/gui)/$(assemble)/Pods/Manifest.lock: $(pwd/gui)/$(assemble)/Podfile $(pwd/gui)/.flutter-plugins-dependencies
 	cd $(pwd/gui)/$(assemble) && pod install
 	touch $@
 

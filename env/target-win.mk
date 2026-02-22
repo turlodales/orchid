@@ -15,6 +15,7 @@ lib := lib
 exe := .exe
 
 meson := windows
+cmake := CYGWIN
 
 archs += i686
 openssl/i686 := mingw
@@ -37,9 +38,9 @@ endif
 include $(pwd)/target-gnu.mk
 
 define _
-more/$(1) := -target $(1)-pc-windows-gnu 
+more/$(1) := -target $(1)-pc-windows-gnu
 more/$(1) += --sysroot $(CURDIR)/$(output)/$(1)/mingw$(bits/$(1))
-temp := $(shell which $(1)-w64-mingw32-ld)
+temp := $$(shell which $(1)-w64-mingw32-ld)
 ifeq ($$(temp),)
 $$(error $(1)-w64-mingw32-ld must be on your path)
 endif
@@ -51,30 +52,25 @@ more := -D_WIN32_WINNT=0x0601
 
 ifeq ($(filter crossndk,$(debug))$(uname-o),Cygwin)
 
-cc := clang$(suffix) $(more)
-cxx := clang++$(suffix) $(more)
-
 ifeq ($(tidy)$(filter notidy,$(debug)),)
 debug += notidy
 endif
 
-ar := llvm-ar
-
+include $(pwd)/kit-default.mk
+# XXX: did just running ar not work?
+define _
+ar/$(1) := llvm-ar
+ranlib/$(1) := $(1)-w64-mingw32-ranlib
+endef
+$(each)
 else
-include $(pwd)/target-ndk.mk
-ar := $(llvm)/bin/llvm-ar
+include $(pwd)/kit-android.mk
 endif
 
 include $(pwd)/target-cxx.mk
-
-source += $(pwd)/libcxx/src/support/win32/locale_win32.cpp
-source += $(pwd)/libcxx/src/support/win32/support.cpp
-cflags += -D_LIBCXXABI_DISABLE_VISIBILITY_ANNOTATIONS
-lflags += -nostdlib++ -lsupc++
+lflags += -lsupc++
 
 define _
-ranlib/$(1) := $(1)-w64-mingw32-ranlib
-ar/$(1) := $(ar)
 strip/$(1) := $(1)-w64-mingw32-strip
 windres/$(1) := $(1)-w64-mingw32-windres
 endef
@@ -91,9 +87,7 @@ lflags += -Wl,-Xlink=-force:multiple
 cflags += -DWIN32_LEAN_AND_MEAN=
 cflags += -D_CRT_RAND_S=
 
-cflags += -fms-extensions
-#cflags += -fms-compatibility
-#cflags += -D__GNUC__
+cflags += -mno-ms-bitfields
 
 #  warning: 'I64' length modifier is not supported by ISO C
 qflags += -Wno-format-non-iso
@@ -105,19 +99,28 @@ mflags += has_function_stpcpy=false
 cflags += -Wno-pragma-pack
 cflags += -Wno-unknown-pragmas
 
+# XXX: fix -I$(CURDIR) in qflags globally
+
 qflags += -I$(CURDIR)/$(pwd)/win32
 qflags += -Wno-nonportable-include-path
 
-cflags += -I$(pwd)/mingw
+qflags += -I$(CURDIR)/$(pwd)/mingw
 
-mingw := git-8.0.0.6001.98dad1fe
+#qflags += -isystem $(CURDIR)/$(pwd)/mingw-w64/mingw-w64-libraries/winpthreads/include
+
+# XXX: https://github.com/dlfcn-win32/dlfcn-win32.git
+
+# XXX: I need gcc as I don't have windows compiler-rt in NDK
+#qflags += --rtlib=compiler-rt
+
+mingw := 13.0.0.r505.g7d006b2ea
 
 msys2 := 
 msys2 += crt-$(mingw)-1
-msys2 += dlfcn-1.2.0-2
-msys2 += gcc-10.2.0-6
+msys2 += dlfcn-1.4.2-1
+msys2 += gcc-15.2.0-11
 msys2 += headers-$(mingw)-1
-msys2 += winpthreads-$(mingw)-3
+msys2 += winpthreads-$(mingw)-1
 
 define _
 temp := $(output)/$(1)/mingw$(bits/$(1))/mingw
@@ -128,7 +131,7 @@ sysroot += $$(temp)
 
 $(output)/$(1)/%.msys2:
 	@mkdir -p $$(dir $$@)
-	curl https://repo.msys2.org/mingw/$(1)/mingw-w64-$(1)-$$*-any.pkg.tar.zst | zstd -d | tar -C $(output)/$(1) -xvf-
+	curl -L https://repo.msys2.org/mingw/$(1)/mingw-w64-$(1)-$$*-any.pkg.tar.zst | zstd -d | tar -C $(output)/$(1) -xvf-
 	@touch $$@
 sysroot += $(patsubst %,$(output)/$(1)/%.msys2,$(msys2))
 endef

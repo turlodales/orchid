@@ -22,30 +22,33 @@ args :=
 include ../chains.mk
 args += --tls ../network.p12
 
+# XXX: there is a note about this in cli-shared's makefile
+distro := ubuntu bionic 7
 include env/target.mk
 
 version := 0.9
 
 .PHONY: all
-all: $(output)/$(machine)/orchid$(exe)
+all: $(output)/$(machine)/orchidstat$(exe)
 
 .PHONY: test
-test: $(output)/$(machine)/orchid$(exe)
+test: $(output)/$(machine)/orchidstat$(exe)
 	$< $(args)
 
 .PHONY: debug
-debug: $(output)/$(machine)/orchid$(exe)
+debug: $(output)/$(machine)/orchidstat$(exe)
 	lldb -o 'run $(args)' $<
 
 .PHONY: record
-record: $(output)/$(machine)/orchid$(exe)
+record: $(output)/$(machine)/orchidstat$(exe)
 	perf record --call-graph dwarf $< $(args)
 
 .PHONY: report
-report: $(output)/$(machine)/orchid$(exe)
+report: $(output)/$(machine)/orchidstat$(exe)
 	perf report --sort=cpu
 
 $(call include,vpn/target.mk)
+$(call include,jinja2cpp/target.mk)
 
 source += $(wildcard $(pwd)/source/*.cpp)
 
@@ -56,7 +59,7 @@ cflags/$(pwd)/source/main.cpp += -Wno-implicit-const-int-float-conversion
 
 include env/output.mk
 
-$(output)/%/orchid$(exe): $(patsubst %,$(output)/$$*/%,$(object) $(linked))
+$(output)/%/orchidstat$(exe): $(patsubst %,$(output)/$$*/%,$(object) $(linked))
 	@echo [LD] $@
 	@set -o pipefail; $(cxx) $(more/$*) $(wflags) -o $@ $(filter %.o,$^) $(filter %.a,$^) $(filter %.lib,$^) $(lflags) 2>&1 | nl
 	@ls -la $@

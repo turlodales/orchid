@@ -15,9 +15,7 @@ path = $(1)
 .PHONY:
 all:
 
-uname-s := $(shell uname -s)
-uname-o := $(shell uname -o 2>/dev/null)
--include $(pwd)/uname-$(uname-s).mk
+include $(pwd)/uname.mk
 
 version := $(shell $(pwd)/version.sh)
 monotonic := $(word 1,$(version))
@@ -47,8 +45,13 @@ archive :=
 
 qflags += -gfull -Os
 cflags += -DNDEBUG
-cflags += -D_FORTIFY_SOURCE=2
 qflags += -fno-omit-frame-pointer
+
+cflags += -D_FORTIFY_SOURCE=2
+# XXX: -fstack-protector-{strong,all}
+# XXX: -param=ssp-buffer-size=4
+# XXX: -fsanitize={shado,safe}-stack
+# XXX: -fstack-clash-protection
 
 cflags += -D__STDC_CONSTANT_MACROS
 cflags += -D__STDC_FORMAT_MACROS
@@ -57,12 +60,27 @@ cflags += -Wall
 cflags += -Werror
 cflags += -Wno-unknown-warning-option
 
+cflags += -Wno-deprecated-coroutine
 cflags += -Wno-deprecated-volatile
 cflags += -Wno-range-loop-analysis
+
+cflags += -Wno-bitwise-op-parentheses
+cflags += -Wno-dangling-else
+cflags += -Wno-empty-body
+cflags += -Wno-logical-op-parentheses
+cflags += -Wno-misleading-indentation
+cflags += -Wno-missing-selector-name
+cflags += -Wno-overloaded-shift-op-parentheses
+cflags += -Wno-potentially-evaluated-expression
+# XXX: cflags += -Wno-shift-op-parentheses
+cflags += -Wno-tautological-constant-out-of-range-compare
+cflags += -Wno-tautological-overlap-compare
 
 cflags += -fmessage-length=0
 cflags += -ferror-limit=0
 cflags += -ftemplate-backtrace-limit=0
+cflags += -fmacro-backtrace-limit=0
+cflags += -fdiagnostics-show-note-include-stack
 
 beta := false
 
@@ -84,6 +102,7 @@ else
 zflags := -0
 endif
 
+
 objc := false
 include $(pwd)/target-$(target).mk
 
@@ -91,7 +110,15 @@ ifeq ($(machine),)
 machine := $(default)
 endif
 
-cflags += -I@/usr/include
+ifneq ($(target),win)
+# XXX: this breaks libgcrypt due to cet.h being ELF-specific
+more/x86_64 += -fcf-protection=full
+endif
+
+# XXX: this broke ARM iOS/macOS exception handling in coroutines
+# XXX: consider using =pac-ret+leaf
+#more/arm64 += -mbranch-protection=standard
+
 
 define depend
 $(foreach arch,$(archs),$(eval $(output)/$(arch)/$(1): $(patsubst @/%,$(output)/$(arch)/%,$(2))))
@@ -104,8 +131,11 @@ $(eval folder := $(subst $(space),/,$(wordlist 2,$(words $(temp)),$(temp))))
 endef
 specific = $(eval $(value preamble))
 
-cflags += -I$(output)/extra
+
 cflags += -I@/extra
+cflags += -I$(output)/extra
+
+cflags += -I@/usr/include
 
 
 # I doubt this will ever become important, but just in case: v8 had this idea ;P
@@ -114,17 +144,17 @@ cflags += -I@/extra
 # -fdebug-compilation-dir .
 # -no-canonical-prefixes
 
-# with clang 10 we get access to -ffile-prefix-map
 # XXX: I don't remember what this was actually for
-qflags += -fdebug-prefix-map=./=
+qflags += -ffile-prefix-map=./=
 # XXX: I need to verify the lack of trailing slash
-qflags += -fdebug-prefix-map=$(CURDIR)=.
+qflags += -ffile-prefix-map=$(CURDIR)=.
 
 rflags += --remap-path-prefix=$(CURDIR)/$(output)/cargo/=~/.cargo/
 
-qflags += -fno-ident
+# putting -fno-ident directly into qflags breaks cmake
+qflags += --config=$(CURDIR)/$(pwd)/fnoident.cfg
 
-.PHONY: force
+
 $(output)/%/extra/revision.hpp: force
 	@mkdir -p $(dir $@)
 ifeq ($(filter nodiff,$(debug)),)

@@ -1,4 +1,4 @@
-import 'package:orchid/orchid.dart';
+import 'package:orchid/orchid/orchid.dart';
 import 'package:flutter/services.dart';
 
 class TapToCopyText extends StatefulWidget {
@@ -6,25 +6,27 @@ class TapToCopyText extends StatefulWidget {
   final String text;
 
   /// Text that overrides what is displayed (e.g. to elide or obfuscate)
-  final String displayText;
+  final String? displayText;
 
-  final TextStyle style;
-  final TextAlign textAlign;
-  final TextOverflow overflow;
-  final EdgeInsets padding;
-  final Widget displayWidget;
+  final TextStyle? style;
+  final TextAlign? textAlign;
+  final TextOverflow? overflow;
+  final EdgeInsets? padding;
+  final Widget? displayWidget;
 
   // Callback to be used in lieu of the default copy functionality
-  final void Function(String text) onTap;
+  final void Function(String text)? onTap;
+  final void Function(String text)? onLongPress;
 
   const TapToCopyText(
     this.text, {
-    Key key,
+    Key? key,
     this.displayText,
     this.displayWidget,
     this.style,
     this.padding,
     this.onTap,
+    this.onLongPress,
     this.overflow,
     this.textAlign,
   }) : super(key: key);
@@ -67,7 +69,14 @@ class _TapToCopyTextState extends State<TapToCopyText> {
             ),
       onTap: () {
         if (widget.onTap != null) {
-          widget.onTap(widget.text);
+          widget.onTap!(widget.text);
+        } else {
+          _doCopy();
+        }
+      },
+      onLongPress: () {
+        if (widget.onLongPress != null) {
+          widget.onLongPress!(widget.text);
         } else {
           _doCopy();
         }

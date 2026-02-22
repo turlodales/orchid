@@ -23,8 +23,14 @@ lflags += -luserenv
 lflags += -lole32
 # XXX: technically for rust
 lflags += -lbcrypt
+lflags += -lntdll
+# XXX: technically for risc0
+lflags += -lncrypt
+lflags += -loleaut32
+lflags += -lruntimeobject
 
 lflags += -lcrypt32
+lflags += -ldbghelp
 lflags += -liphlpapi
 lflags += -lpsapi
 lflags += -lsecur32
@@ -35,10 +41,6 @@ lflags += -lws2_32
 cflags/$(pwd)/webrtc/rtc_base/checks.cc += -Wno-format
 
 cflags/$(pwd)/webrtc/rtc_base/platform_thread_types.cc += -include $(pwd/webrtc)/../setname.hpp
-cflags/$(pwd)/abseil-cpp/absl/base/internal/thread_identity.cc += -include pthread.h
-
-chacks/$(pwd)/webrtc/api/task_queue/task_queue_base.cc += s/defined(WEBRTC_POSIX)/1/g
-chacks/$(pwd)/webrtc/rtc_base/synchronization/yield_policy.cc += s/defined(WEBRTC_POSIX)/1/g
 
 source += $(pwd)/webrtc/rtc_base/win32.cc
 source += $(pwd)/webrtc/rtc_base/win/windows_version.cc

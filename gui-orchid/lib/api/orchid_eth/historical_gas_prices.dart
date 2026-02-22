@@ -1,10 +1,9 @@
-// @dart=2.12
 import 'dart:math';
 import 'package:orchid/util/cacheable.dart';
 import 'chains.dart';
 import 'eth_rpc.dart';
 import 'package:orchid/util/hex.dart';
-import 'package:orchid/api/orchid_log_api.dart';
+import 'package:orchid/api/orchid_log.dart';
 import 'package:orchid/util/series_binary_search.dart';
 
 class HistoricalGasPrices {
@@ -131,7 +130,7 @@ class GasPrice {
   }
 }
 
-class GasPriceDateTimeComparable extends Comparable<GasPrice> {
+class GasPriceDateTimeComparable implements Comparable<GasPrice> {
   final DateTimeComparable compare;
 
   GasPriceDateTimeComparable({required DateTime date, required Duration within})

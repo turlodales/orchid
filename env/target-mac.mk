@@ -9,6 +9,8 @@
 # }}}
 
 
+cmake := Darwin
+
 archs += i386
 openssl/i386 := darwin-i386-cc
 host/i386 := i386-apple-darwin
@@ -23,14 +25,23 @@ triple/x86_64 := x86_64-apple-darwin
 meson/x86_64 := x86_64
 bits/x86_64 := 64
 
+archs += arm64
+openssl/arm64 := darwin64-arm64-cc
+host/arm64 := arm64-apple-darwin
+triple/arm64 := aarch64-apple-darwin
+meson/arm64 := aarch64
+bits/arm64 := 64
+
 ifeq ($(machine),)
 machine := x86_64
 endif
 
 sdk := macosx
 runtime := osx
-more := -mmacosx-version-min=10.14
+more := -mmacosx-version-min=10.15
 include $(pwd)/target-apl.mk
+
+xcframework := macos-arm64_x86_64
 
 contents := /Contents
 resources := /Resources

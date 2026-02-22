@@ -1,14 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:orchid/api/orchid_eth/v1/orchid_contract_v1.dart';
-import 'package:orchid/util/units.dart';
-
 import 'chains.dart';
 import 'token_type.dart';
 
 class MarketConditions {
   final Token maxFaceValue;
   final Token costToRedeem;
-  final double efficiency;
+  final double? efficiency;
   final bool limitedByBalance;
 
   MarketConditions(
@@ -55,13 +52,13 @@ class PotStats {
   final Token gasPrice;
 
   PotStats({
-    @required this.chain,
-    @required this.version,
-    @required this.efficiency,
-    @required this.tickets,
-    @required this.createDeposit,
-    @required this.createBalance,
-    @required this.createGas,
-    @required this.gasPrice,
+    required this.chain,
+    required this.version,
+    required this.efficiency,
+    required this.tickets,
+    required this.createDeposit,
+    required this.createBalance,
+    required this.createGas,
+    required this.gasPrice,
   });
 }

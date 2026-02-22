@@ -68,7 +68,11 @@ $(call include,shared/target-ios.mk)
 local := 
 local += app.mm.o
 
-local += $(subst %,.,$(word 1,$(generated))).o
+temp := $(subst %,.,$(word 1,$(generated)))
+local += $(temp).o
+
+$(call depend,$(temp).o,$(output)/XCBuildData/build.db)
+cflags/$(temp) += -fmodules $(patsubst %,-fmodule-map-file=%,$(wildcard $(output)/Release-$(sdk)/*/*.modulemap)) -Wno-ignored-attributes
 
 include env/output.mk
 
@@ -117,7 +121,7 @@ signed += $(bundle)/$(name)
 $(bundle)/$(name): $(patsubst %,$(output)/$(machine)/%,$(local)) $(output)/XCBuildData/build.db
 	@mkdir -p $(dir $@)
 	@echo [LD] $@
-	@$(cxx) $(more/$(machine)) $(wflags) -o $@ $(filter %.o,$^) $(lflags) -rpath "@executable_path/Frameworks" $(patsubst %,-framework %,$(frameworks)) $(output)/Release-$(sdk)/libPods-Runner.a $(output)/Release-$(sdk)/*/lib*.a
+	@$(cxx) $(more/$(machine)) $(wflags) -o $@ $(filter %.o,$^) $(lflags) -rpath /usr/lib/swift -rpath "@executable_path/Frameworks" $(patsubst %,-framework %,$(frameworks)) $(output)/Release-$(sdk)/libPods-Runner.a $(output)/Release-$(sdk)/*/lib*.a $(foreach pod,$(wildcard $(pwd/gui)/ios/Pods/*/Frameworks/*.framework),-F$(dir $(pod))) -L$(isysroot)/usr/lib/swift -L$(toolchain)/usr/lib/swift{-5.0,}/$(sdk) -lobjc
 
 signed += $(bundle)/Info.plist
 $(bundle)/Info.plist: info-app.plist.in
@@ -139,7 +143,7 @@ $(bundle)/Assets.car: $(wildcard Assets.xcassets/*/*)
 	@mkdir -p $(output)/info
 	# XXX: --launch-image LaunchImage
 	actool --output-format human-readable-text --errors --warnings --notices \
-	    --target-device iphone --target-device ipad --minimum-deployment-target 11.0 \
+	    --target-device iphone --target-device ipad --minimum-deployment-target 13.0 \
 	    --platform iphoneos \
 	    --app-icon AppIcon \
 	    --compress-pngs \

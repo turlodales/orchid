@@ -1,12 +1,12 @@
-import 'package:orchid/orchid.dart';
+import 'package:orchid/orchid/orchid.dart';
 
 /// A text editing controller that manages a typed value
 abstract class ValueFieldController<T> {
   final textController = TextEditingController();
 
-  T get value;
+  T? get value;
 
-  set value(T value);
+  set value(T? value);
 
   String get text => textController.text;
 
@@ -14,7 +14,7 @@ abstract class ValueFieldController<T> {
 
   bool get hasValue {
     final text = textController.text;
-    return text != null && text != '' && value != null;
+    return text.isEmpty && text != '' && value != null;
   }
 
   bool get hasNoValue {

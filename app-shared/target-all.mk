@@ -22,33 +22,38 @@ forks :=
 include $(pwd/gui)/target.mk
 
 pwd/flutter := $(pwd)/flutter
-flutter := $(CURDIR)/$(pwd/flutter)/bin/flutter --suppress-analytics --verbose
+flutter := $(CURDIR)/$(pwd/flutter)/bin/flutter --suppress-analytics --verbose --no-version-check
 
 # -a is needed as flutter (incorrectly) only installs files for windows *target* on windows *host*
 # https://github.com/flutter/flutter/issues/58379
-precache := --linux --macos --windows -a
 
-$(pwd/flutter)/packages/flutter/pubspec.lock: $(pwd/flutter)/packages/flutter/pubspec.yaml $(call head,$(pwd/flutter))
+# XXX: ugh. now I had to disable all the windows support due to Failed to download https://storage.googleapis.com/flutter_infra_release/flutter/b8800d88be4866db1b15f8b954ab2573bba9960f/windows-arm64/artifacts.zip. Ensure you have network connectivity and then try again. Exception: 404
+# I actually think I can get them to fix this, as this breaks precache -a even without --windows and even without --enable-windows-desktop
+
+precache := --android --ios --linux --macos #--windows
+
+$(pwd/flutter)/packages/flutter_tools/pubspec.lock: $(pwd/flutter)/packages/flutter_tools/pubspec.yaml $(call head,$(pwd/flutter))
 	cd $(pwd/flutter) && git clean -fxd
 	cd $(pwd/flutter) && bin/flutter config --enable-linux-desktop
 	cd $(pwd/flutter) && bin/flutter config --enable-macos-desktop
-	cd $(pwd/flutter) && bin/flutter config --enable-windows-desktop
+	#cd $(pwd/flutter) && bin/flutter config --enable-windows-desktop
 	cd $(pwd/flutter) && bin/flutter precache $(precache)
 	cd $(pwd/flutter) && bin/flutter update-packages
 
 dart := 
 dart += $(pwd/gui)/.dart_tool/package_config.json
-dart += $(pwd/gui)/.flutter-plugins
+dart += $(pwd/gui)/.flutter-plugins-dependencies
 dart += $(pwd/gui)/.packages
 
 # XXX: use $(dart) to generate the first three of these
-$(pwd/gui)/.dart_tool/package_config%json $(pwd/gui)/%flutter-plugins $(pwd/gui)/%packages $(generated): $(pwd/gui)/pubspec.yaml $(pwd/gui)/pubspec.lock $(pwd/flutter)/packages/flutter/pubspec.lock $(forks)
+$(pwd/gui)/.dart_tool/package_config%json $(pwd/gui)/%flutter-plugins-dependencies $(pwd/gui)/%packages $(generated): $(pwd/gui)/pubspec.yaml $(pwd/gui)/pubspec.lock $(pwd/flutter)/packages/flutter_tools/pubspec.lock $(forks)
 	@mkdir -p $(pwd/gui)/{android,ios,linux,macos,windows}
-	@rm -f $(pwd/gui)/.flutter-plugins
+	@rm -f $(pwd/gui)/.flutter-plugins-dependencies
+	! grep ': ^' $(pwd/gui)/pubspec.yaml
 	cd $(pwd/gui) && $(flutter) pub get
 	@touch $(pwd/gui)/.packages
 
-dart += $(pwd/flutter)/packages/flutter/pubspec.lock
+dart += $(pwd/flutter)/packages/flutter_tools/pubspec.lock
 dart += $(shell find $(pwd/gui)/lib/ -name '*.dart' -o -name '*.arb')
 
 ifeq ($(filter noaot,$(debug)),)

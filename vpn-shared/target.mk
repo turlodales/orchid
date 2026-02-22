@@ -27,10 +27,7 @@ source += $(wildcard $(pwd)/libmaxminddb/src/*.c)
 cflags += -I$(pwd)/libmaxminddb/include
 cflags/$(pwd)/libmaxminddb/ += -DUNICODE
 cflags/$(pwd)/libmaxminddb/ += -Wno-incompatible-pointer-types-discards-qualifiers
-
-ifneq ($(target),win)
 cflags/$(pwd)/libmaxminddb/ += -DPACKAGE_VERSION='""'
-endif
 
 cflags += -DMMDB_UINT128_IS_BYTE_ARRAY
 
@@ -40,11 +37,9 @@ $(call include,quickjs.mk)
 # I figured out where they hid their new issue tracker and am pending.
 ifneq (,)
 $(call include,tor.mk)
-else
-$(call include,zlb/target.mk)
 endif
 
 $(call include,libevent.mk)
 
 $(call include,wsk/target.mk)
-$(call include,p2p/target.mk)
+$(call include,lib/target.mk)

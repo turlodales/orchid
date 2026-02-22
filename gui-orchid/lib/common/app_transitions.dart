@@ -18,8 +18,8 @@ class AppTransitions {
 // https://stackoverflow.com/a/53503738/74975
 class NoAnimationMaterialPageRoute<T> extends MaterialPageRoute<T> {
   NoAnimationMaterialPageRoute({
-    @required WidgetBuilder builder,
-    RouteSettings settings,
+    required WidgetBuilder builder,
+    RouteSettings? settings,
     bool maintainState = true,
     bool fullscreenDialog = false,
   }) : super(

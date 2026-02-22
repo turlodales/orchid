@@ -216,7 +216,7 @@ void Capture::Land(const Buffer &data) {
     orc_ignore({ if (Datagram(data, [&](const Socket &source, const Socket &destination, const Buffer &data) {
         if (destination != Socket(Resolver_, 53))
             return false;
-        up_.Hatch([&]() noexcept { return [=, data = Beam(data)]() mutable -> task<void> {
+        up_.Hatch([&]() noexcept { return [this, source, destination, data = Beam(data)]() mutable -> task<void> {
             const Query query(data.span());
 
             const auto resolver([&]() {
@@ -314,8 +314,6 @@ class Punch :
     {
     }
 
-    virtual ~Punch() = default;
-
     task<void> Send(const Buffer &data, const Socket &socket) {
         co_return co_await Inner().Send(data, socket);
     }
@@ -323,6 +321,8 @@ class Punch :
 
 class Plant {
   public:
+    virtual ~Plant() = default;
+
     virtual task<void> Pull(const Four &four) noexcept = 0;
 };
 
@@ -464,6 +464,7 @@ class Transform :
     // https://superuser.com/questions/1056492/rst-sequence-number-and-window-size/1075512
     void Reset(const Socket &source, const Socket &destination, uint32_t sequence, uint32_t acknowledge) noexcept {
         // XXX: rename this to data
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
         struct {
             openvpn::IPv4Header ip4;
             openvpn::TCPHeader tcp;
@@ -480,7 +481,7 @@ class Transform :
         header.ip4.saddr = boost::endian::native_to_big(source.Host().operator uint32_t());
         header.ip4.daddr = boost::endian::native_to_big(destination.Host().operator uint32_t());
 
-        // NOLINTNEXTLINE (clang-analyzer-core.uninitialized.Assign)
+        // NOLINTNEXTLINE(clang-analyzer-core.uninitialized.Assign)
         header.ip4.check = openvpn::IPChecksum::checksum(&header.ip4, sizeof(header.ip4));
 
         header.tcp.source = boost::endian::native_to_big(source.Port());
@@ -493,7 +494,7 @@ class Transform :
         header.tcp.check = 0;
         header.tcp.urgent_p = 0;
 
-        // NOLINTNEXTLINE (clang-analyzer-core.UndefinedBinaryOperatorResult)
+        // NOLINTNEXTLINE(clang-analyzer-core.UndefinedBinaryOperatorResult)
         header.tcp.check = openvpn::udp_checksum(
             reinterpret_cast<uint8_t *>(&header.tcp),
             sizeof(header.tcp),
@@ -624,6 +625,9 @@ task<bool> Transform::Send(const Beam &data) {
                 Log() << "ICMP" << subset << std::endl;
             co_return true;
         } break;
+
+        default:
+            break;
     }
 
     co_return false;
@@ -678,7 +682,8 @@ BufferSunk &Capture::Start() {
     return backup;
 }
 
-static JSValue Print(JSContext *context, JSValueConst self, int argc, JSValueConst *argv) { try {
+namespace {
+JSValue Print(JSContext *context, JSValueConst self, int argc, JSValueConst *argv) { try {
     orc_assert(argc == 1);
     size_t size;
     const auto data(JS_ToCStringLen(context, &size, argv[0]));
@@ -688,10 +693,12 @@ static JSValue Print(JSContext *context, JSValueConst self, int argc, JSValueCon
     Log() << std::string(data, size) << std::endl;
     return JS_UNDEFINED;
 } catch (const std::exception &error) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
     return JS_ThrowInternalError(context, "%s", error.what());
-} }
+} } }
 
-static task<void> Single(BufferSunk &sunk, Heap &heap, const S<Network> &network, const S<Ethereum> &ethereum, const S<Base> &base, const Host &local, unsigned hop, const boost::filesystem::path &group, const Locator &locator, const S<Updated<Prices>> &oracle, const Token &oxt) { orc_block({
+namespace {
+task<void> Single(BufferSunk &sunk, Heap &heap, const S<Network> &network, const S<Ethereum> &ethereum, const S<Base> &base, const Host &local, unsigned hop, const boost::filesystem::path &group, const Locator &locator, const S<Updated<Prices>> &oracle, const Token &oxt) { orc_block({
     const std::string hops("hops[" + std::to_string(hop) + "]");
     const auto protocol(heap.eval<std::string>(hops + ".protocol"));
     if (false) {
@@ -701,10 +708,10 @@ static task<void> Single(BufferSunk &sunk, Heap &heap, const S<Network> &network
         const auto secret(orc_value(return, Bless<Secret>(heap.eval<std::string>(hops + ".secret")), "parsing .secret"));
         const Address funder(heap.eval<std::string>(hops + ".funder"));
         const std::string curator(heap.eval<std::string>(hops + ".curator"));
-        auto chain(co_await Chain::New({locator, base}, {}, uint256_t(heap.eval<double>(hops + ".chainid", 1))));
+        auto chain(co_await Chain::New({locator, base}, uint256_t(heap.eval<double>(hops + ".chainid", 1))));
         const auto provider(co_await network->Select(curator, heap.eval<std::string>(hops + ".provider", "0x0000000000000000000000000000000000000000")));
         auto &client(co_await Client0::Wire(sunk, oracle, oxt, lottery, secret, funder));
-        co_await client.Open(provider, base);
+        co_await client.Open(base, provider.locator_, provider.fingerprint_);
 
     } else if (protocol == "orch1d") {
         const Address lottery(heap.eval<std::string>(hops + ".lottery", "0x6dB8381b2B41b74E17F5D4eB82E8d5b04ddA0a82"));
@@ -716,7 +723,7 @@ static task<void> Single(BufferSunk &sunk, Heap &heap, const S<Network> &network
         Locator locator(heap.eval<std::string>(hops + ".rpc"));
         std::string currency(heap.eval<std::string>(hops + ".currency"));
         auto &client(co_await Client1::Wire(sunk, oracle, co_await Market::New(5*60*1000, ethereum, base, chain, std::move(currency), std::move(locator)), lottery, secret, funder));
-        co_await client.Open(provider, base);
+        co_await client.Open(base, provider.locator_, provider.fingerprint_);
 
     } else if (protocol == "openvpn") {
         co_await Connect(sunk, base, local.operator uint32_t(),
@@ -727,7 +734,7 @@ static task<void> Single(BufferSunk &sunk, Heap &heap, const S<Network> &network
     } else if (protocol == "wireguard") {
         co_await Guard(sunk, base, local.operator uint32_t(), heap.eval<std::string>(hops + ".config"));
     } else orc_assert_(false, "unknown hop protocol: " << protocol);
-}, "building hop #" << hop); }
+}, "building hop #" << hop); } }
 
 void Capture::Start(const std::string &path) {
     Heap heap; {

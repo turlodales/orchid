@@ -1,10 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'orchid.dart';
 import 'package:orchid/api/orchid_urls.dart';
 import 'package:orchid/common/app_buttons.dart';
 import 'package:orchid/common/link_text.dart';
-import '../orchid.dart';
-import 'orchid_colors.dart';
 import 'package:styled_text/styled_text.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -81,9 +78,9 @@ class OrchidText {
 
   // ?? migrate to link items below
   static LinkTextSpan buildLearnMoreLinkTextSpan(
-      {BuildContext context, Color color}) {
+      {required BuildContext context, required Color color}) {
     return LinkTextSpan(
-      text: S.of(context).learnMore,
+      text: S.of(context)!.learnMore,
       style: OrchidText.body2.copyWith(color: color),
       url: OrchidUrls.partsOfOrchidAccount,
     );
@@ -94,6 +91,10 @@ class OrchidText {
 extension TextStyleExtensions on TextStyle {
   TextStyle get black {
     return this.copyWith(color: Colors.black);
+  }
+
+  TextStyle get grey {
+    return this.copyWith(color: Colors.grey);
   }
 
   TextStyle get red {
@@ -139,8 +140,8 @@ extension LinkTextStyleExtensions on TextStyle {
   /// Create an action tag that opens a URL on tap
   StyledTextActionTag link(String url) {
     return StyledTextActionTag(
-      (text, attributes) {
-        return launch(url, forceSafariVC: false);
+      (text, attributes) async {
+        await launch(url, forceSafariVC: false);
       },
       style: this,
     );
@@ -164,7 +165,7 @@ extension TextExtensions on Text {
     textHeightBehavior,
   }) {
     return Text(
-      this.data,
+      this.data ?? '',
       style: style ?? this.style,
       strutStyle: strutStyle ?? this.strutStyle,
       textAlign: textAlign ?? this.textAlign,
@@ -262,25 +263,25 @@ extension OrchidTextExtensions on Text {
   }
 
   Text height(double height) {
-    return this.copyWith(style: this.style.copyWith(height: height));
+    return this.copyWith(style: this.style?.copyWith(height: height));
   }
 
   Text get white {
-    return this.copyWith(style: this.style.copyWith(color: Colors.white));
+    return this.copyWith(style: this.style?.copyWith(color: Colors.white));
   }
 
   Text get black {
-    return this.copyWith(style: this.style.copyWith(color: Colors.black));
+    return this.copyWith(style: this.style?.copyWith(color: Colors.black));
   }
 
   Text get tappable {
     return this
-        .copyWith(style: this.style.copyWith(color: OrchidColors.tappable));
+        .copyWith(style: this.style?.copyWith(color: OrchidColors.tappable));
   }
 
   Text get error {
     return this
-        .copyWith(style: this.style.copyWith(color: OrchidColors.status_red));
+        .copyWith(style: this.style?.copyWith(color: OrchidColors.status_red));
   }
 
   Text get inactive {
@@ -297,7 +298,7 @@ extension OrchidTextExtensions on Text {
 
   Text get new_purple_bright {
     return this.copyWith(
-        style: this.style.copyWith(color: OrchidColors.new_purple_bright));
+        style: this.style?.copyWith(color: OrchidColors.new_purple_bright));
   }
 
   Text get center {
@@ -305,18 +306,18 @@ extension OrchidTextExtensions on Text {
   }
 
   Text get bold {
-    return this.copyWith(style: this.style.bold);
+    return this.copyWith(style: this.style?.bold);
   }
 
   Text get semibold {
-    return this.copyWith(style: this.style.semibold);
+    return this.copyWith(style: this.style?.semibold);
   }
 
   Text get medium {
-    return this.copyWith(style: this.style.medium);
+    return this.copyWith(style: this.style?.medium);
   }
 
-  Widget link({@required String url, TextStyle style}) {
+  Widget link({required String url, TextStyle? style}) {
     return RichText(
         key: Key(url),
         text: LinkTextSpan(
@@ -326,15 +327,16 @@ extension OrchidTextExtensions on Text {
         ));
   }
 
-  Widget linkButton({@required VoidCallback onTapped, TextStyle style}) {
+  Widget linkButton({required VoidCallback onTapped, TextStyle? style, double? pad_y}) {
     return LinkStyleTextButton(
-      this.data,
+      this.data ?? '',
       style: style ?? this.style,
       onTapped: onTapped,
+      pad_y: pad_y,
     );
   }
 
-  Text withColor(Color color) {
+  Text withColor(Color? color) {
     return this
         .copyWith(style: (this.style ?? TextStyle()).copyWith(color: color));
   }

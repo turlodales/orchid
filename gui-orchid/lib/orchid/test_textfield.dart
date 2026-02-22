@@ -1,13 +1,16 @@
-import 'package:orchid/orchid.dart';
+import 'package:orchid/orchid/orchid.dart';
 import 'package:orchid/orchid/field/orchid_text_field.dart';
-import 'package:orchid/util/test_app.dart';
+import 'package:orchid/orchid/test_app.dart';
+
+// Note: This redundant import of material is required in the main dart file.
+import 'package:flutter/material.dart';
 
 void main() {
-  runApp(TestApp(scale: 5.0, content: _Test()));
+  runApp(TestApp(scale: 2.0, content: _Test()));
 }
 
 class _Test extends StatefulWidget {
-  const _Test({Key key}) : super(key: key);
+  const _Test({Key? key}) : super(key: key);
 
   @override
   __TestState createState() => __TestState();
@@ -67,7 +70,7 @@ class __TestState extends State<_Test> with TickerProviderStateMixin {
 
   Widget _buildTextHeightOverlay(TextStyle textStyle) {
     return Container(
-      height: textStyle.fontSize * (textStyle.height ?? 1.0),
+      height: (textStyle.fontSize ?? 12.0) * (textStyle.height ?? 1.0),
       width: 150,
       color: Colors.grey.withOpacity(0.2),
     );

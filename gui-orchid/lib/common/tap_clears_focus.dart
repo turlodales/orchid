@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 ///
 class TapClearsFocus extends StatelessWidget {
   const TapClearsFocus({
-    Key key,
-    @required this.child,
+    Key? key,
+    required this.child,
   }) : super(key: key);
 
   final Widget child;

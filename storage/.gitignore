@@ -1,0 +1,14 @@
+__pycache__
+.idea
+venv
+file_1MB.dat
+*.encoded
+*.dat
+a.py
+a.sh
+a.svg
+recovered
+twin_coding_nogf.py
+output.html
+repository
+providers.jsonc

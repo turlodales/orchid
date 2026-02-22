@@ -41,7 +41,7 @@ void Client::Transfer(size_t size, bool send) {
     { const auto locked(locked_());
     (send ? locked->output_ : locked->input_) += size;
     const auto updated(locked->output_ + locked->input_);
-    if (updated - locked->updated_ < 1024*256)
+    if (updated - locked->updated_ < 1024ULL*256)
         return;
     locked->updated_ = updated; }
     Update();
@@ -111,7 +111,7 @@ void Client::Land(Pipe *pipe, const Buffer &data) {
         const auto &[magic, id] = header;
         orc_assert(magic == Magic_);
 
-        Scan(window, [&, &id = id](const Buffer &data) { try {
+        Scan(window, [&](const Buffer &data) { try {
             Invoice(id, data);
         } orc_catch({}) });
     } orc_catch({}) return true; })) {
@@ -130,10 +130,12 @@ Client::Client(BufferDrain &drain, S<Updated<Prices>> oracle) :
 {
 }
 
-task<void> Client::Open(const Provider &provider, const S<Base> &base) {
-    const auto verify([&](const std::list<const rtc::OpenSSLCertificate> &certificates) -> bool {
+task<void> Client::Open(const S<Base> &base, const Locator &locator, const S<rtc::SSLFingerprint> &fingerprint) {
+    const auto verify([&](const std::list<rtc::OpenSSLCertificate> &certificates) -> bool {
+        if (!fingerprint)
+            return true;
         for (const auto &certificate : certificates)
-            if (*provider.fingerprint_ == *rtc::SSLFingerprint::Create(provider.fingerprint_->algorithm, certificate))
+            if (*fingerprint == *rtc::SSLFingerprint::Create(fingerprint->algorithm, certificate))
                 return true;
         return false;
     });
@@ -141,12 +143,13 @@ task<void> Client::Open(const Provider &provider, const S<Base> &base) {
     auto &bonding(Bond());
     auto &defragment(bonding.Wire<BufferSink<Defragment>>());
 
-    socket_ = co_await Channel::Wire(defragment, base, [&]() {
+    co_await Channel::Wire(defragment, base, [&]() {
         Configuration configuration;
         configuration.tls_ = local_;
         return configuration;
     }(), [&](std::string offer) -> task<std::string> {
-        const auto answer((co_await base->Fetch("POST", provider.locator_, {
+        // XXX: implement 307 redirect
+        const auto answer((co_await base->Fetch("POST", locator, {
             {"content-type", "application/sdp"},
         }, offer, verify))());
         if (Verbose) {
@@ -180,7 +183,7 @@ uint64_t Client::Benefit() {
 
 Float Client::Spent() {
     const auto locked(locked_());
-    orc_assert(locked->pending_.empty());
+    orc_assert_(locked->pending_.empty(), locked->pending_.size() << " pending ticket(s)");
     return locked->spent_;
 }
 

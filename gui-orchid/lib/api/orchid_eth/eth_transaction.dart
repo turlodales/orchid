@@ -1,27 +1,25 @@
-import 'package:flutter/foundation.dart';
 import 'package:orchid/util/hex.dart';
 import '../orchid_crypto.dart';
 
-class EthereumTransaction extends EthereumTransactionParams {
+class EthereumTransaction /*extends EthereumTransactionParams*/ {
   final EthereumTransactionParams params;
   final String data;
-  final int nonce;
+  final int? nonce;
 
   EthereumTransaction({
-    @required this.params,
-    @required this.data,
+    required this.params,
+    required this.data,
     this.nonce,
   });
 
   Map<String, dynamic> toJson() {
     // Export flat json
     var json = params.toJson();
-    json.addAll({'data': data});
+    json['data'] = data;
+
     // Exclude nonce if null
     if (nonce != null) {
-      json.addAll({
-        'nonce': nonce, // decimal int
-      });
+      json['nonce'] = nonce;
     }
     return json;
   }
@@ -35,8 +33,7 @@ class EthereumTransaction extends EthereumTransactionParams {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      super == other &&
-          other is EthereumTransaction &&
+      other is EthereumTransaction &&
           runtimeType == other.runtimeType &&
           params == other.params &&
           data == other.data &&
@@ -74,12 +71,12 @@ class EthereumTransactionParams {
   final int chainId;
 
   EthereumTransactionParams({
-    @required this.from,
-    @required this.to,
-    @required this.gas,
-    @required this.gasPrice,
-    @required this.value,
-    @required this.chainId,
+    required this.from,
+    required this.to,
+    required this.gas,
+    required this.gasPrice,
+    required this.value,
+    required this.chainId,
   });
 
   Map<String, dynamic> toJson() {

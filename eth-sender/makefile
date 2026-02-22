@@ -29,10 +29,18 @@ all: $(output)/$(machine)/cj$(exe)
 test: $(output)/$(machine)/cj$(exe)
 	$< $(args)
 
-source += $(wildcard source/*.cpp)
-cflags += -Isource
+source += $(wildcard $(pwd)/source/*.cpp)
+cflags += -I$(pwd)/source
 
-$(call include,p2p/target.mk)
+# XXX: this literally crashes clang-tidy and I haven't filed the bug
+checks/$(pwd)/source/main.cpp += -bugprone-unchecked-optional-access
+
+$(call include,lib/target.mk)
+
+linked += $(pwd)/riscy/librust.a
+cflags += -I$(pwd)/riscy
+$(call depend,$(pwd)/riscy/librust.a,$(patsubst %,$(pwd)/riscy/%,Cargo.toml Cargo.lock riscy.rs))
+
 include env/output.mk
 
 $(output)/%/cj$(exe): $(patsubst %,$(output)/$$*/%,$(object) $(linked))

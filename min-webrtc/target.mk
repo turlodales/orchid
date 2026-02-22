@@ -19,25 +19,40 @@ cflags += -I$(pwd)/webrtc
 webrtc := 
 
 
+# XXX: wrapping_async_dns_resolver.cc should have been deleted in 24510d43dccc88a47e2cd139b2190e25d4c7b700
 webrtc += $(filter-out \
     %/create_peerconnection_factory.cc \
+    %/enable_media.cc \
+    %/enable_media_with_defaults.cc \
+    %/field_trials_registry.cc \
+    %/frame_transformer_factory.cc \
+    %/wrapping_async_dns_resolver.cc \
 ,$(wildcard $(pwd)/webrtc/api/*.cc))
 
 webrtc += $(wildcard $(pwd)/webrtc/api/crypto/*.cc)
+webrtc += $(wildcard $(pwd)/webrtc/api/task_queue/*.cc)
 webrtc += $(wildcard $(pwd)/webrtc/api/transport/*.cc)
 webrtc += $(wildcard $(pwd)/webrtc/api/transport/media/*.cc)
+webrtc += $(wildcard $(pwd)/webrtc/api/transport/rtp/*.cc)
 webrtc += $(wildcard $(pwd)/webrtc/api/units/*.cc)
 
+webrtc += $(pwd)/webrtc/api/field_trials_registry.cc
+
+webrtc += $(pwd)/webrtc/api/audio/audio_processing_statistics.cc
+
+webrtc += $(pwd)/webrtc/api/audio_codecs/audio_codec_pair_id.cc
 webrtc += $(pwd)/webrtc/api/audio_codecs/audio_encoder.cc
+webrtc += $(pwd)/webrtc/api/audio_codecs/audio_format.cc
+
 webrtc += $(pwd)/webrtc/api/call/transport.cc
+webrtc += $(pwd)/webrtc/api/environment/environment_factory.cc
 webrtc += $(pwd)/webrtc/api/numerics/samples_stats_counter.cc
 
 webrtc += $(pwd)/webrtc/api/rtc_event_log/rtc_event.cc
 webrtc += $(pwd)/webrtc/api/rtc_event_log/rtc_event_log.cc
 
-webrtc += $(pwd)/webrtc/api/task_queue/task_queue_base.cc
-
 webrtc += $(pwd)/webrtc/api/video/color_space.cc
+webrtc += $(pwd)/webrtc/api/video/encoded_frame.cc
 webrtc += $(pwd)/webrtc/api/video/encoded_image.cc
 webrtc += $(pwd)/webrtc/api/video/hdr_metadata.cc
 webrtc += $(pwd)/webrtc/api/video/video_bitrate_allocation.cc
@@ -46,18 +61,26 @@ webrtc += $(pwd)/webrtc/api/video/video_frame_metadata.cc
 webrtc += $(pwd)/webrtc/api/video/video_source_interface.cc
 webrtc += $(pwd)/webrtc/api/video/video_timing.cc
 
+webrtc += $(pwd)/webrtc/api/video_codecs/av1_profile.cc
 webrtc += $(pwd)/webrtc/api/video_codecs/h264_profile_level_id.cc
+webrtc += $(pwd)/webrtc/api/video_codecs/scalability_mode.cc
 webrtc += $(pwd)/webrtc/api/video_codecs/sdp_video_format.cc
+webrtc += $(pwd)/webrtc/api/video_codecs/simulcast_stream.cc
 webrtc += $(pwd)/webrtc/api/video_codecs/video_codec.cc
 webrtc += $(pwd)/webrtc/api/video_codecs/vp9_profile.cc
 
 webrtc += $(pwd)/webrtc/call/call_config.cc
+webrtc += $(pwd)/webrtc/call/payload_type_picker.cc
 webrtc += $(pwd)/webrtc/call/rtp_bitrate_configurator.cc
 webrtc += $(pwd)/webrtc/call/rtp_config.cc
 webrtc += $(pwd)/webrtc/call/rtp_demuxer.cc
 webrtc += $(pwd)/webrtc/call/rtp_payload_params.cc
 webrtc += $(pwd)/webrtc/call/rtp_transport_controller_send.cc
 webrtc += $(pwd)/webrtc/call/rtp_video_sender.cc
+
+webrtc += $(pwd)/webrtc/common_video/corruption_detection_converters.cc
+
+webrtc += $(pwd)/webrtc/common_video/generic_frame_descriptor/generic_frame_info.cc
 
 webrtc += $(pwd)/webrtc/common_video/h264/h264_common.cc
 webrtc += $(pwd)/webrtc/common_video/h264/pps_parser.cc
@@ -82,22 +105,30 @@ webrtc += $(filter-out \
 webrtc += $(wildcard $(pwd)/webrtc/media/sctp/*.cc)
 
 webrtc += $(pwd)/webrtc/modules/audio_coding/audio_network_adaptor/audio_network_adaptor_config.cc
-webrtc += $(pwd)/webrtc/modules/audio_processing/include/audio_processing_statistics.cc
 
 webrtc += $(wildcard $(pwd)/webrtc/modules/congestion_controller/goog_cc/*.cc)
 webrtc += $(wildcard $(pwd)/webrtc/modules/congestion_controller/rtp/*.cc)
 webrtc += $(wildcard $(pwd)/webrtc/modules/pacing/*.cc)
 webrtc += $(wildcard $(pwd)/webrtc/modules/remote_bitrate_estimator/*.cc)
 webrtc += $(wildcard $(pwd)/webrtc/modules/rtp_rtcp/include/*.cc)
-webrtc += $(wildcard $(pwd)/webrtc/modules/rtp_rtcp/source/*.cc)
+
+webrtc += $(filter-out \
+    %_h265.cc \
+,$(wildcard $(pwd)/webrtc/modules/rtp_rtcp/source/*.cc))
+
 webrtc += $(wildcard $(pwd)/webrtc/modules/rtp_rtcp/source/deprecated/*.cc)
 webrtc += $(wildcard $(pwd)/webrtc/modules/rtp_rtcp/source/rtcp_packet/*.cc)
 webrtc += $(wildcard $(pwd)/webrtc/modules/utility/source/*.cc)
 
 webrtc += $(pwd)/webrtc/modules/video_coding/chain_diff_calculator.cc
+webrtc += $(pwd)/webrtc/modules/video_coding/encoded_frame.cc
 webrtc += $(pwd)/webrtc/modules/video_coding/frame_dependencies_calculator.cc
+# XXX: why is this in the include folder?!
+webrtc += $(pwd)/webrtc/modules/video_coding/include/video_codec_interface.cc
 
-webrtc += $(shell find $(pwd)/webrtc/net -name '*.cc' | LC_COLLATE=C sort)
+webrtc += $(filter-out \
+    %/reassembly_streams.cc \
+,$(shell find $(pwd)/webrtc/net -name '*.cc' | LC_COLLATE=C sort))
 
 webrtc += $(wildcard $(pwd)/webrtc/p2p/base/*.cc)
 webrtc += $(wildcard $(pwd)/webrtc/p2p/client/*.cc)
@@ -111,6 +142,7 @@ webrtc += $(filter-out \
     %/ifaddrs_converter.cc \
     %/nat_server.cc \
     %/nat_socket_factory.cc \
+    %/trace_categories.cc \
 ,$(wildcard $(pwd)/webrtc/rtc_base/*.cc))
 
 # XXX: I'd prefer to remove all %/experiments/*
@@ -123,26 +155,6 @@ webrtc += $(wildcard $(pwd)/webrtc/rtc_base/*/*/*.cc)
 
 webrtc += $(wildcard $(pwd)/webrtc/stats/*.cc)
 webrtc += $(wildcard $(pwd)/webrtc/system_wrappers/source/*.cc)
-
-
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/base/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/base/internal/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/debugging/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/debugging/internal/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/numeric/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/numeric/internal/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/profiling/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/profiling/internal/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/types/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/types/internal/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/strings/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/strings/internal/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/synchronization/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/synchronization/internal/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/time/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/time/internal/*.cc)
-webrtc += $(wildcard $(pwd)/abseil-cpp/absl/time/internal/cctz/src/*.cc)
-cflags += -I$(pwd)/abseil-cpp
 
 
 pwd/libsrtp := $(pwd)/libsrtp
@@ -172,11 +184,11 @@ webrtc := $(filter-out $(pwd)/webrtc/rtc_base/system/%,$(webrtc))
 source += $(pwd)/webrtc/rtc_base/system/file_wrapper.cc
 
 webrtc := $(filter-out $(pwd)/webrtc/rtc_base/boringssl_%.cc,$(webrtc))
-webrtc := $(filter-out $(pwd)/webrtc/rtc_base/%_gcd.cc,$(webrtc))
-webrtc := $(filter-out $(pwd)/webrtc/rtc_base/%_libevent.cc,$(webrtc))
+webrtc := $(filter-out $(pwd)/webrtc/%_gcd.cc,$(webrtc))
+webrtc := $(filter-out $(pwd)/webrtc/%_libevent.cc,$(webrtc))
+webrtc := $(filter-out $(pwd)/webrtc/%_libevent_experiment.cc,$(webrtc))
 webrtc := $(filter-out $(pwd)/webrtc/rtc_base/mac_%.cc,$(webrtc))
-webrtc := $(filter-out $(pwd)/webrtc/rtc_base/%_stdlib.cc,$(webrtc))
-webrtc := $(filter-out $(pwd)/webrtc/rtc_base/%_win.cc,$(webrtc))
+webrtc := $(filter-out $(pwd)/webrtc/%_win.cc,$(webrtc))
 webrtc := $(filter-out $(pwd)/webrtc/rtc_base/win/%.cc,$(webrtc))
 webrtc := $(filter-out $(pwd)/webrtc/rtc_base/win32%.cc,$(webrtc))
 
@@ -201,6 +213,13 @@ webrtc := $(foreach v,$(webrtc),$(if $(findstring /test,$(v)),,$(v)))
 webrtc := $(foreach v,$(webrtc),$(if $(findstring /virtual_,$(v)),,$(v)))
 
 source += $(webrtc)
+
+
+$(output)/$(pwd/webrtc)/experiments/registered_field_trials.h: $(pwd/webrtc)/experiments/field_trials.py
+	@mkdir -p $(dir $@)
+	python3 $< header >$@
+header += $(output)/$(pwd/webrtc)/experiments/registered_field_trials.h
+cflags += -I$(output)/$(pwd/webrtc)
 
 
 cflags += -DWEBRTC_HAVE_SCTP
@@ -233,21 +252,23 @@ cflags += -DSCTP_USE_OPENSSL_SHA1
 
 # disable dcsctp congestion controller
 chacks/$(pwd/webrtc)/media/sctp/dcsctp_transport.cc += s/ options;/ options{.cwnd_mtus_initial = 10000, .cwnd_mtus_min = 10000};/g;
-# disallow blocking signaling thread
-chacks/$(pwd/webrtc)/rtc_base/event.cc += /::Wait(/{s/\/\*//;s/\*\///;s/$$/ if (warn_after_ms != kForever) std::terminate();/;};
 # do not allocate statistics collector
 chacks/$(pwd/webrtc)/pc/rtc_stats_collector.cc += s/rtc::make_ref_counted<RTCStatsCollector>([^;]*/nullptr/g;
+# completely prevent the use of FD_SET
+chacks/$(pwd/webrtc)/rtc_base/physical_socket_server.cc += /::WaitSelect/s/$$/ return false;/;
 
 # XXX: https://bugs.chromium.org/p/webrtc/issues/detail?id=12967
 chacks/$(pwd/webrtc)/p2p/base/dtls_transport.cc += /Should not happen\./,/;/d;
 
+# XXX: https://issues.webrtc.org/issues/339131894
+chacks/$(pwd/webrtc)/p2p/base/stun_port.cc += /^void UDPPort::OnResolveResult(/,/^}/s/^}/MaybeSetPortCompleteOrError();}/
+
+# XXX: just chacks/ this fwrite to somehow access orc::Log
 # XXX: a bug needs to be filed for this :/
 # vpn/p2p/rtc/webrtc/rtc_base/checks.cc:49:3: error: ignoring return value of function declared with 'warn_unused_result' attribute [-Werror,-Wunused-result]
 #   fwrite(output.data(), output.size(), 1, stderr);
 #   ^~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 cflags/$(pwd/webrtc)/rtc_base/checks.cc += -Wno-unused-result
 
-
-include $(pwd)/openssl.mk
 
 include $(pwd)/target-$(target).mk

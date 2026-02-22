@@ -1,0 +1,23 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+__pycache__
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+*~
+
+cfg_server_test.json
+venv
+env.sh

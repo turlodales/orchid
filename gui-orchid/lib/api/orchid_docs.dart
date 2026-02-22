@@ -1,5 +1,5 @@
 import 'dart:async' show Future;
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
@@ -12,6 +12,23 @@ class OrchidDocs {
 
   static Future<String> privacyPolicy() async {
     return await rootBundle.loadString('assets/docs/privacy.txt');
+  }
+
+  /// Fetch the licenses for Flutter packages used by the front end.
+  static Future<String> flutterLicenseRegistryText() async {
+    final div = '-' * 40 + '\n';
+    return (await LicenseRegistry.licenses.toList()).map((license) {
+      final text = StringBuffer();
+      text.write(div);
+      final packages = license.packages.toList();
+      text.write(
+          packages.length > 1 ? 'Flutter Packages: ' : 'Flutter Package: ');
+      text.writeAll(license.packages, ', ');
+      text.write('\n');
+      text.write(div);
+      text.writeAll(license.paragraphs.map((e) => e.text), '\n');
+      return text.toString();
+    }).join('\n\n');
   }
 
   static Future<String> helpOverview(BuildContext context) async {
@@ -47,12 +64,12 @@ class OrchidDocs {
     );
     return html.replaceAllMapped(exp, (match) {
       String platform = OrchidPlatform.operatingSystem.toLowerCase();
-      String targetPlatforms = match.group(1)?.toLowerCase();
+      String? targetPlatforms = match.group(1)?.toLowerCase();
       if (targetPlatforms != null &&
           targetPlatforms.split(RegExp(r' *, *')).contains(platform)) {
         return ''; // exclude, replace with nothing.
       }
-      return match.group(0); // include
+      return match.group(0) ?? ''; // include
     });
   }
 }

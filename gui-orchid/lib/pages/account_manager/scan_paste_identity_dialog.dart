@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:orchid/api/configuration/orchid_user_config/orchid_account_import.dart';
+import 'package:orchid/api/orchid_user_config/orchid_account_import.dart';
 import 'package:orchid/api/orchid_platform.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:orchid/common/app_sizes.dart';
-import 'package:orchid/pages/account_manager/scan_paste_identity.dart';
+import 'package:orchid/orchid/field/orchid_labeled_identity_field.dart';
 import 'package:orchid/common/formatting.dart';
 import 'package:orchid/orchid/orchid_colors.dart';
 import 'package:orchid/orchid/orchid_text.dart';
 import 'package:orchid/util/localization.dart';
 
 typedef ImportAccountCompletion = void Function(
-    ParseOrchidIdentityResult result);
+    ParseOrchidIdentityOrAccountResult result);
 
 // Used from the AccountManagerPage and AdHopPage:
 // Dialog that contains the two button scan/paste control.
@@ -18,34 +16,33 @@ class ScanOrPasteIdentityDialog extends StatefulWidget {
   final ImportAccountCompletion onImportAccount;
 
   const ScanOrPasteIdentityDialog({
-    Key key,
-    this.onImportAccount,
+    Key? key,
+    required this.onImportAccount,
   }) : super(key: key);
 
   static Future<void> show({
-    BuildContext context,
-    ImportAccountCompletion onImportAccount,
+    required BuildContext context,
+    required ImportAccountCompletion onImport,
   }) {
     return showDialog(
         context: context,
         builder: (BuildContext context) {
           return ScanOrPasteIdentityDialog(
-            onImportAccount: onImportAccount,
+            onImportAccount: onImport,
           );
         });
   }
 
   @override
-  State<ScanOrPasteIdentityDialog> createState() => _ScanOrPasteIdentityDialogState();
+  State<ScanOrPasteIdentityDialog> createState() =>
+      _ScanOrPasteIdentityDialogState();
 }
 
 class _ScanOrPasteIdentityDialogState extends State<ScanOrPasteIdentityDialog> {
-  ParseOrchidIdentityResult _parsed;
+  ParseOrchidIdentityOrAccountResult? _parsed;
 
   @override
   Widget build(BuildContext context) {
-    S s = S.of(context);
-    double screenWidth = MediaQuery.of(context).size.width;
     final pasteOnly = OrchidPlatform.doesNotSupportScanning;
     var bodyText = pasteOnly
         ? s.pasteAnOrchidKeyFromTheClipboardToImportAll
@@ -67,7 +64,8 @@ class _ScanOrPasteIdentityDialogState extends State<ScanOrPasteIdentityDialog> {
                     children: <Widget>[
                       RichText(
                           text: TextSpan(
-                              text: s.importOrchidIdentity, style: OrchidText.title)),
+                              text: s.importOrchidIdentity,
+                              style: OrchidText.title)),
                     ],
                   ).right(16),
                 ),
@@ -87,22 +85,18 @@ class _ScanOrPasteIdentityDialogState extends State<ScanOrPasteIdentityDialog> {
                     width: 300,
                     child: Column(
                       children: [
-                        ScanOrPasteOrchidIdentity(
-                          spacing: screenWidth < AppSize.iphone_12_pro_max.width
-                              ? 8
-                              : 16,
-                          pasteOnly: pasteOnly,
-                          onChange: (ParseOrchidIdentityResult parsed) {
+                        OrchidLabeledImportIdentityField(
+                          label: s.orchidIdentity,
+                          onChange: (parsed) {
                             setState(() {
                               _parsed = parsed;
                             });
                           },
                         ),
-                        pady(24),
                         OrchidImportButton(
                           enabled: _parsed != null,
                           onPressed: _doImportAccount,
-                        ),
+                        ).top(24),
                       ],
                     ),
                   ),
@@ -122,15 +116,15 @@ class _ScanOrPasteIdentityDialogState extends State<ScanOrPasteIdentityDialog> {
     if (_parsed == null) {
       return;
     }
-    widget.onImportAccount(_parsed);
+    widget.onImportAccount(_parsed!);
     Navigator.of(context).pop();
   }
 }
 
 class OrchidCloseButton extends StatelessWidget {
   const OrchidCloseButton({
-    Key key,
-    @required this.context,
+    Key? key,
+    required this.context,
   }) : super(key: key);
 
   final BuildContext context;
@@ -151,9 +145,9 @@ class OrchidCloseButton extends StatelessWidget {
 
 class OrchidImportButton extends StatelessWidget {
   const OrchidImportButton({
-    Key key,
-    @required this.enabled,
-    @required this.onPressed,
+    Key? key,
+    required this.enabled,
+    required this.onPressed,
   }) : super(key: key);
 
   final bool enabled;

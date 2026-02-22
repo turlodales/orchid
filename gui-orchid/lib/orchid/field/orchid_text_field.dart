@@ -1,10 +1,12 @@
-import 'package:orchid/orchid.dart';
+import 'package:orchid/orchid/orchid.dart';
 import 'package:flutter/services.dart';
 
 /// A styled text field with an optional custom trailing component.
+/// The text field can be optionally configured as numeric (integer or decimal) with text output.
+/// @see OrchidLabledNumericField for a typed numeric field.
 class OrchidTextField extends StatelessWidget {
-  final String hintText;
-  final Widget trailing;
+  final String? hintText;
+  final Widget? trailing;
   final TextEditingController controller;
   final bool obscureText;
   final int maxLines;
@@ -16,24 +18,31 @@ class OrchidTextField extends StatelessWidget {
   final bool readOnly;
 
   final bool numeric;
-  final VoidCallback onClear;
-  final ValueChanged<String> onChanged;
+
+  /// If numeric, whether to allow decimal values
+  final bool decimal;
+
+  final VoidCallback? onClear;
+  final ValueChanged<String>? onChanged;
   final bool border;
-  final TextStyle style;
-  final EdgeInsets contentPadding;
-  final EdgeInsets suffixIconPadding;
-  final TextAlignVertical textAlignVertical;
-  final double cursorHeight;
+  final TextStyle? style;
+  final EdgeInsets? contentPadding;
+  final EdgeInsets? suffixIconPadding;
+  final TextAlignVertical? textAlignVertical;
+  final double? cursorHeight;
+  final bool autoFocus;
+  final ValueChanged<String>? onSubmitted;
 
   OrchidTextField({
+    required this.controller,
     this.hintText,
     this.trailing,
-    this.controller,
     this.obscureText = false,
     this.maxLines = 1,
     this.enabled = true,
     this.readOnly = false,
     this.numeric = false,
+    this.decimal = true,
     this.onClear,
     this.onChanged,
     this.border = true,
@@ -42,6 +51,8 @@ class OrchidTextField extends StatelessWidget {
     this.textAlignVertical,
     this.suffixIconPadding,
     this.cursorHeight,
+    this.autoFocus = false,
+    this.onSubmitted,
   });
 
   @override
@@ -64,7 +75,7 @@ class OrchidTextField extends StatelessWidget {
             onPressed: () {
               controller.clear();
               if (onClear != null) {
-                onClear();
+                onClear!();
               }
             },
             icon: Icon(
@@ -79,11 +90,13 @@ class OrchidTextField extends StatelessWidget {
       children: <Widget>[
         Expanded(
           child: TextField(
+            onSubmitted: onSubmitted,
             enabled: enabled,
             style: textStyle,
             obscureText: obscureText,
             controller: controller,
             autocorrect: false,
+            autofocus: autoFocus,
             textAlign: TextAlign.left,
             textAlignVertical: textAlignVertical ?? TextAlignVertical.bottom,
             cursorHeight: cursorHeight,
@@ -105,17 +118,22 @@ class OrchidTextField extends StatelessWidget {
               suffixIcon: suffixIcon,
             ),
             cursorColor: Colors.white,
-            keyboardType:
-                numeric ? TextInputType.numberWithOptions(decimal: true) : null,
+            keyboardType: numeric
+                ? TextInputType.numberWithOptions(decimal: decimal)
+                : null,
             inputFormatters: numeric
-                ? <TextInputFormatter>[
-                    // include comma as decimal separator
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                  ]
+                ? (decimal
+                    ? <TextInputFormatter>[
+                        // include comma as decimal separator
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                      ]
+                    : <TextInputFormatter>[
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+                      ])
                 : null,
           ),
         ),
-        trailing != null ? trailing : Container(),
+        trailing != null ? trailing! : Container(),
       ],
     );
   }

@@ -1,5 +1,4 @@
 import 'dart:ui';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'orchid_colors.dart';
@@ -10,7 +9,7 @@ class OrchidCircularEfficiencyIndicators {
     return _colorAndGlowColorForEfficiency(efficiency)[0];
   }
 
-  static List<Color> _colorAndGlowColorForEfficiency(double efficiency) {
+  static List<Color> _colorAndGlowColorForEfficiency(double? efficiency) {
     if (efficiency == null || efficiency < 0.3) {
       return [Color(0xffff6f97), Color(0xffff6f97)];
     }
@@ -60,7 +59,7 @@ class OrchidCircularEfficiencyIndicators {
 }
 
 class OrchidCircularProgressIndicator extends StatelessWidget {
-  final double value;
+  final double? value;
   final double size;
   final Color color;
   final Color glowColor;
@@ -69,7 +68,7 @@ class OrchidCircularProgressIndicator extends StatelessWidget {
   final Color backgroundColor;
 
   OrchidCircularProgressIndicator({
-    Key key,
+    Key? key,
     this.value = 0.5,
     this.size = 64.0,
     this.blur = 16.0,
@@ -100,18 +99,22 @@ class OrchidCircularProgressIndicator extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           ImageFiltered(
-              imageFilter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation(color),
-                value: value,
-                strokeWidth: stroke,
-              )),
+            imageFilter: ImageFilter.blur(
+              sigmaX: blur,
+              sigmaY: blur,
+              tileMode: TileMode.decal,
+            ),
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation(color),
+              value: value,
+              strokeWidth: stroke,
+            ),
+          ),
           CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation(glowColor),
             strokeWidth: stroke,
             value: value,
             backgroundColor: backgroundColor,
-            // value: 0.5,
           ),
         ],
       ),

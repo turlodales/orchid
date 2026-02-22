@@ -1,15 +1,20 @@
 import 'package:flutter/services.dart';
-import 'package:orchid/api/configuration/orchid_user_config/orchid_account_import.dart';
+import 'package:orchid/api/orchid_keys.dart';
+import 'package:orchid/api/orchid_platform.dart';
+import 'package:orchid/api/orchid_user_config/orchid_account_import.dart';
 import 'package:orchid/api/orchid_eth/chains.dart';
 import 'package:orchid/api/orchid_eth/orchid_account.dart';
+import 'package:orchid/api/preferences/user_preferences_keys.dart';
+import 'package:orchid/vpn/purchase/orchid_pac_seller.dart';
 import 'package:orchid/common/rounded_rect.dart';
-import 'package:orchid/orchid.dart';
+import 'package:orchid/orchid/orchid.dart';
 import 'package:orchid/api/orchid_crypto.dart';
 import 'package:orchid/api/orchid_urls.dart';
-import 'package:orchid/api/preferences/user_preferences.dart';
-import 'package:orchid/api/purchase/orchid_pac.dart';
-import 'package:orchid/api/purchase/orchid_pac_transaction.dart';
-import 'package:orchid/api/purchase/orchid_purchase.dart';
+import 'package:orchid/vpn/preferences/user_preferences_vpn.dart';
+import 'package:orchid/vpn/purchase/orchid_pac.dart';
+import 'package:orchid/vpn/purchase/orchid_pac_transaction.dart';
+import 'package:orchid/vpn/purchase/orchid_purchase.dart';
+import 'package:orchid/orchid/account/account_selector.dart';
 import 'package:orchid/orchid/field/orchid_labeled_address_field.dart';
 import 'package:orchid/orchid/field/orchid_labeled_identity_field.dart';
 import 'package:orchid/orchid/menu/orchid_chain_selector_menu.dart';
@@ -17,22 +22,22 @@ import 'package:orchid/orchid/orchid_action_button.dart';
 import 'package:orchid/orchid/orchid_checkbox.dart';
 import 'package:orchid/orchid/orchid_circular_identicon.dart';
 import 'package:orchid/orchid/orchid_circular_progress.dart';
-import 'package:orchid/orchid/orchid_panel.dart';
+import 'package:orchid/orchid/orchid_titled_panel.dart';
 import 'package:orchid/pages/purchase/purchase_page.dart';
-import 'package:orchid/util/units.dart';
+import 'package:orchid/util/format_decimal.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:styled_text/styled_text.dart';
 import '../app_routes.dart';
 
 class WelcomePanel extends StatefulWidget {
-  final VoidCallback onDismiss;
+  final VoidCallback? onDismiss;
   final void Function(Account account) onAccount;
-  final StoredEthereumKey defaultIdentity;
+  final StoredEthereumKey? defaultIdentity;
 
   const WelcomePanel({
-    Key key,
-    this.onDismiss,
-    this.onAccount,
+    Key? key,
+    required this.onDismiss,
+    required this.onAccount,
     this.defaultIdentity,
   }) : super(key: key);
 
@@ -41,14 +46,17 @@ class WelcomePanel extends StatefulWidget {
 }
 
 class _WelcomePanelState extends State<WelcomePanel> {
-  _State _state;
-  PAC _dollarPAC;
-  StoredEthereumKey _generatedIdentity;
-  StoredEthereumKey _importedIdentity;
+  _State? _state;
+  PAC? _dollarPAC;
+  StoredEthereumKey? _generatedIdentity;
+  StoredEthereumKey? _importedIdentity;
 
   // This could be either the imported or generated identity, depending on whether
   // the user hits the "back" button.
-  StoredEthereumKey _selectedIdentity;
+  StoredEthereumKey? _selectedIdentity;
+
+  EthereumAddress? _funderAddress;
+  Chain? _chain;
 
   @override
   void initState() {
@@ -59,7 +67,7 @@ class _WelcomePanelState extends State<WelcomePanel> {
   }
 
   void initStateAsync() async {
-    UserPreferences().pacTransaction.stream().listen((tx) {
+    UserPreferencesVPN().pacTransaction.stream().listen((tx) {
       if (tx == null) {
         // If we already have an identity supplied skip the choice.
         if (_selectedIdentity != null) {
@@ -85,6 +93,7 @@ class _WelcomePanelState extends State<WelcomePanel> {
             break;
         }
       }
+
       if (mounted) {
         setState(() {});
       }
@@ -105,79 +114,36 @@ class _WelcomePanelState extends State<WelcomePanel> {
     }
     return SizedBox(
       width: double.infinity,
-      child: Container(
-        color: Colors.black,
-        child: Container(
-          color: OrchidColors.dark_background.withOpacity(0.25),
-          child: OrchidPanel(
-            highlight: true,
-            child: AnimatedSize(
-                alignment: Alignment.topCenter,
-                duration: millis(250),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildTitle(),
-                    Flexible(
-                        child: SingleChildScrollView(child: _buildContent())),
-                  ],
-                )),
-          ),
-        ),
-      ),
+      child:
+          OrchidTitledPanel.title(title: _buildTitle(), body: _buildContent()),
     ).padx(28);
   }
 
   Widget _buildTitle() {
-    final style = OrchidText.title.withHeight(2.0);
-    final title = _getTitleContent();
-
-    return Opacity(
-      opacity: 0.99,
-      child: Container(
-        width: double.infinity,
-        height: 52,
-        color: Colors.white.withOpacity(0.1),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            ((title.backState != null)
-                    ? IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _state = title.backState;
-                          });
-                        },
-                        icon: Icon(Icons.chevron_left),
-                        color: Colors.white,
-                      )
-                    : Container())
-                .width(48),
-            Flexible(
-                child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(title.text).withStyle(style))),
-            ((title.showDismiss)
-                    ? IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _dismiss();
-                          });
-                        },
-                        icon: Icon(Icons.close),
-                        color: Colors.white,
-                      )
-                    : Container())
-                .width(48),
-          ],
-        ),
-      ),
-    );
+    final titleContent = _getTitleContent();
+    return OrchidTitledPanelTitle(
+        titleText: titleContent.text,
+        onDismiss: titleContent.showDismiss
+            ? () {
+                setState(() {
+                  _dismiss();
+                });
+              }
+            : null,
+        onBack: titleContent.backState != null
+            ? () {
+                setState(() {
+                  _state = titleContent.backState;
+                });
+              }
+            : null);
   }
 
   // merge this with _buildContent
   _TitleContent _getTitleContent() {
     switch (_state) {
+      // null should not be possible here due to page logic.
+      case null:
       case _State.welcome:
         return _TitleContent(text: s.welcomeToOrchid);
       case _State.setup_choice:
@@ -194,7 +160,7 @@ class _WelcomePanelState extends State<WelcomePanel> {
 
       case _State.setup_account:
         return _TitleContent(
-          text: s.accountSetUp,
+          text: s.linkAnOrchidAccount,
           backState: _selectedIdentity == _generatedIdentity
               ? _State.backup_identity
               : _State.setup_choice,
@@ -209,39 +175,35 @@ class _WelcomePanelState extends State<WelcomePanel> {
         return _TitleContent(text: s.fundYourAccount);
 
       case _State.processing_pac:
-      case _State.processing_chain:
       case _State.processing_timeout:
         return _TitleContent(text: s.processing, showDismiss: true);
+
+      case _State.processing_chain:
+        return _TitleContent(text: s.purchaseComplete, showDismiss: false);
     }
-    throw Exception();
   }
 
   Widget _buildContent() {
     switch (_state) {
+      // Null case guarded by page logic, should not be reached.
+      case null:
       case _State.welcome:
         return _buildContentWelcomeState();
-        break;
       case _State.setup_choice:
         return _buildContentSetupChoiceState();
-        break;
       case _State.setup_account:
         return _buildContentSetupAccountState();
-        break;
       case _State.backup_identity:
         return _buildContentBackupIdentityState();
-        break;
 
       case _State.confirm_purchase:
       case _State.confirm_purchase_wait:
         return _buildContentConfirmPurchaseState();
-        break;
       case _State.processing_pac:
       case _State.processing_chain:
       case _State.processing_timeout:
         return _buildContentProcessingPurchaseState();
-        break;
     }
-    throw Exception();
   }
 
   Widget _buildContentWelcomeState() {
@@ -257,27 +219,28 @@ class _WelcomePanelState extends State<WelcomePanel> {
         OrchidActionButton(
           height: 50,
           enabled: true,
-          text: s.setUpAccount,
+          text: s.importAccount.toUpperCase(),
           onPressed: () {
             setState(() {
               _state = _State.setup_choice;
             });
           },
         ),
-        pady(16),
-        Visibility(
-          visible: _dollarPAC != null,
-          child: OrchidOutlineButton(
-            text: s.buyCredits.toUpperCase(),
-            onPressed: () {
-              setState(() {
-                _state = _State.confirm_purchase;
-              });
-            },
-          ),
-        ),
+        if (OrchidPlatform.hasPurchase)
+          Visibility(
+            visible: _dollarPAC != null,
+            child: OrchidOutlineButton(
+              text: s.buyCredits.toUpperCase(),
+              onPressed: () {
+                setState(() {
+                  _state = _State.confirm_purchase;
+                });
+              },
+            ),
+          ).top(16),
         pady(24),
-        Text(s.illDoThisLater).linkButton(onTapped: _dismiss),
+        if (widget.onDismiss != null)
+          Text(s.illDoThisLater).linkButton(onTapped: _dismiss),
         pady(40),
       ],
     );
@@ -293,7 +256,7 @@ class _WelcomePanelState extends State<WelcomePanel> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text("Generate a new Identity" + ':').body2.top(32).padx(24),
+        Text(s.generateNewIdentity + ':').body2.top(32).padx(24),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -320,18 +283,15 @@ class _WelcomePanelState extends State<WelcomePanel> {
           text: s.enterAnExistingOrchidIdentity + ':',
           tags: tags,
         ).top(24).padx(24),
-        OrchidLabeledIdentityField(
+        OrchidLabeledImportIdentityField(
           label: s.orchidIdentity,
-          onChange: (ParseOrchidIdentityResult result) async {
+          onChange: (ParseOrchidIdentityOrAccountResult? result) async {
             if (result != null) {
-              if (result.isNew) {
-                await UserPreferences().addKey(result.signer);
+              if (result.hasMultipleAccounts) {
+                await _importMultipleAccounts(result.accounts ?? []);
+              } else {
+                await _importSingleAccount(result);
               }
-              setState(() {
-                _importedIdentity = result.signer;
-                _selectedIdentity = _importedIdentity;
-                _state = _State.setup_account;
-              });
             }
           },
         ).top(16).padx(24).bottom(40),
@@ -339,8 +299,36 @@ class _WelcomePanelState extends State<WelcomePanel> {
     );
   }
 
-  EthereumAddress _funderAddress;
-  Chain _chain;
+  Future<void> _importSingleAccount(
+      ParseOrchidIdentityOrAccountResult result) async {
+    await result.saveIfNeeded();
+
+    if (result.account != null) {
+      // Populate the form even though it is not currently shown.
+      _funderAddress = result.account!.funder;
+      _chain = Chains.chainFor(result.account!.chainId);
+      // We don't have a version selector in account import yet
+      // _version = result.account.version;
+      widget.onAccount(result.account!);
+    }
+    setState(() {
+      _importedIdentity = result.signer;
+      _selectedIdentity = _importedIdentity;
+      _state = _State.setup_account;
+    });
+  }
+
+  Future<void> _importMultipleAccounts(List<Account> accounts) async {
+    await AccountSelectorDialog.show(
+      context: context,
+      accounts: accounts,
+      onSelectedAccounts: (accounts) async {
+        await ParseOrchidIdentityOrAccountResult.saveAccountsIfNeeded(accounts);
+        // TODO
+        widget.onAccount(accounts.first);
+      },
+    );
+  }
 
   Widget _buildContentSetupAccountState() {
     if (_selectedIdentity == null) {
@@ -352,13 +340,14 @@ class _WelcomePanelState extends State<WelcomePanel> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(s.yourOrchidIdentityPublicAddress + ':').body2.height(2.0).top(16),
-        _buildAddress(address: _selectedIdentity.address).top(16),
+        _buildAddress(address: _selectedIdentity!.address).top(16),
         _buildCopyIdentityButton(
-                value: _selectedIdentity.address
+                value: _selectedIdentity!.address
                     .toString(prefix: true, elide: false))
             .center
-            .top(16),
-        Text(s.pasteTheWeb3WalletAddress).body2.top(32),
+            .top(8),
+        DappUtil.buildDappLink(_selectedIdentity?.address),
+        Text(s.enterYourWeb3).body2.top(16),
         OrchidLabeledAddressField(
           label: s.funderWalletAddress,
           onChange: (value) {
@@ -406,7 +395,7 @@ class _WelcomePanelState extends State<WelcomePanel> {
       return Container();
     }
 
-    var config = _generatedIdentity.toExportString();
+    var config = _generatedIdentity!.toExportString();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -465,7 +454,7 @@ class _WelcomePanelState extends State<WelcomePanel> {
               value: _backupComplete,
               onChanged: (value) {
                 setState(() {
-                  _backupComplete = value;
+                  _backupComplete = value ?? false;
                 });
               },
             ).bottom(8),
@@ -499,7 +488,7 @@ class _WelcomePanelState extends State<WelcomePanel> {
     ).padx(24);
   }
 
-  Row _buildAddress({@required EthereumAddress address, bool elide = false}) {
+  Row _buildAddress({required EthereumAddress address, bool elide = false}) {
     return Row(
       children: [
         OrchidCircularIdenticon(size: 22, address: address),
@@ -513,15 +502,15 @@ class _WelcomePanelState extends State<WelcomePanel> {
     );
   }
 
-  TextButton _buildCopyIdentityButton({@required String value, String label}) {
+  TextButton _buildCopyIdentityButton({required String value, String? label}) {
     return TextButton(
       child: Row(
         children: [
           Icon(Icons.copy, color: OrchidColors.tappable, size: 20),
-          Text(label ?? "Copy Identity").body2.tappable.left(14).top(2),
+          Text(label ?? s.copyIdentity).body2.tappable.left(14).top(2),
           SizedBox(width: 20),
         ],
-      ),
+      ).pady(8),
       onPressed: () {
         Clipboard.setData(ClipboardData(text: value));
       },
@@ -550,7 +539,8 @@ class _WelcomePanelState extends State<WelcomePanel> {
           text: s.confirmPurchase,
           onPressed: _generateIdentityAndDoPurchase,
         ).top(40),
-        Text(s.illDoThisLater).linkButton(onTapped: _dismiss).top(24),
+        if (widget.onDismiss != null)
+          Text(s.illDoThisLater).linkButton(onTapped: _dismiss).top(24),
         StyledText(
           textAlign: TextAlign.center,
           style: OrchidText.caption.copyWith(fontSize: 12),
@@ -572,11 +562,13 @@ class _WelcomePanelState extends State<WelcomePanel> {
   Widget _buildContentProcessingPurchaseState() {
     String text;
     switch (_state) {
+      // Null case guarded by page logic, should not be reached.
+      case null:
       case _State.processing_pac:
         text = s.yourPurchaseIsInProgress;
         break;
       case _State.processing_chain:
-        text = s.yourPurchaseIsCompleteAndIsNowBeingProcessedBy;
+        text = s.yourPurchaseIsComplete;
         break;
       case _State.processing_timeout:
         text = s.thisPurchaseIsTakingLongerThanExpectedToProcessAnd;
@@ -592,11 +584,15 @@ class _WelcomePanelState extends State<WelcomePanel> {
         throw Exception();
     }
 
-    bool timeout;
+    bool timeout = false;
+    bool complete = false;
     switch (_state) {
       case _State.processing_pac:
+        timeout = false;
+        break;
       case _State.processing_chain:
         timeout = false;
+        complete = true;
         break;
       case _State.processing_timeout:
       case _State.welcome:
@@ -604,6 +600,7 @@ class _WelcomePanelState extends State<WelcomePanel> {
       case _State.confirm_purchase_wait:
         timeout = true;
         break;
+      case null:
       case _State.setup_choice:
       case _State.backup_identity:
       case _State.setup_account:
@@ -614,15 +611,22 @@ class _WelcomePanelState extends State<WelcomePanel> {
       mainAxisSize: MainAxisSize.min,
       children: [
         pady(24),
-        if (timeout)
+
+        // icon
+        if (complete)
+          Icon(Icons.check, color: OrchidColors.green, size: 40)
+        else if (timeout)
           Icon(Icons.error, color: Color(0xFFF88B9F), size: 40)
         else
           OrchidCircularProgressIndicator.smallIndeterminate(
               size: 30, stroke: 4),
-        if (!timeout) ...[
+
+        // wait message
+        if (!timeout && !complete) ...[
           pady(24),
           Text(s.thisMayTakeAMinute).subtitle,
         ],
+
         pady(24),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 48.0),
@@ -636,7 +640,29 @@ class _WelcomePanelState extends State<WelcomePanel> {
           ),
         ),
         pady(24),
-        if (timeout) ...[
+
+        if (complete) ...[
+          // User hits continue, returning the new PAC account.
+          TextButton(
+            onPressed: () async {
+              _dismiss();
+              final funderAddress = OrchidPacSeller.sellerContractAddress;
+              final account = Account.fromSignerKeyRef(
+                  // generated identity should exist by virtue of page logic
+                  signerKey: _generatedIdentity!.ref(),
+                  funder: funderAddress,
+                  chainId: Chains.GNOSIS_CHAINID,
+                  version: 1);
+              await UserPreferencesVPN().addCachedDiscoveredAccounts([account]);
+              widget.onAccount(account);
+            },
+            child: Text(
+              s.continueButton,
+              style: OrchidText.button.tappable,
+            ),
+          ),
+          pady(32),
+        ] else if (timeout) ...[
           TextButton(
             onPressed: () {
               AppRoutes.pushAccountManager(context);
@@ -652,7 +678,7 @@ class _WelcomePanelState extends State<WelcomePanel> {
     );
   }
 
-  Widget _buildConfirmPurchaseDetails({@required PAC pac}) {
+  Widget _buildConfirmPurchaseDetails({required PAC? pac}) {
     if (pac == null) {
       log("welcome panel: pac null");
       return Text("...");
@@ -672,21 +698,21 @@ class _WelcomePanelState extends State<WelcomePanel> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(s.vpnCredits).body2,
-              Text(formatCurrency(credits, locale: context.locale)).body2,
+              Text(formatDouble(credits, locale: context.locale)).body2,
             ],
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(s.blockchainFee).body2,
-              Text('+ ' + formatCurrency(fee, locale: context.locale)).body2,
+              Text('+ ' + formatDouble(fee, locale: context.locale)).body2,
             ],
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(s.promotion, style: OrchidText.body2.blueHightlight),
-              Text('- ' + formatCurrency(promo, locale: context.locale),
+              Text('- ' + formatDouble(promo, locale: context.locale),
                   style: OrchidText.body2.blueHightlight),
             ],
           ),
@@ -695,7 +721,7 @@ class _WelcomePanelState extends State<WelcomePanel> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(s.total.toUpperCase()).subtitle,
-              Text(formatCurrency(total, locale: context.locale)).subtitle,
+              Text(formatDouble(total, locale: context.locale)).subtitle,
             ],
           )
         ],
@@ -707,7 +733,7 @@ class _WelcomePanelState extends State<WelcomePanel> {
     if (_generatedIdentity == null) {
       log("welcome panel: generating identity");
       final key = StoredEthereumKey.generate();
-      await UserPreferences().addKey(key);
+      await UserPreferencesKeys().addKey(key);
       setState(() {
         _generatedIdentity = key;
       });
@@ -729,9 +755,9 @@ class _WelcomePanelState extends State<WelcomePanel> {
       _state = _State.confirm_purchase_wait;
     });
     await PurchaseUtils.purchase(
-      purchase: _dollarPAC,
-      signerKey: _generatedIdentity,
-      onError: ({rateLimitExceeded}) async {
+      purchase: _dollarPAC!,
+      signerKey: _generatedIdentity!,
+      onError: ({required rateLimitExceeded}) async {
         setState(() {
           // This should really be an additional error state
           _state = _State.processing_timeout;
@@ -741,25 +767,24 @@ class _WelcomePanelState extends State<WelcomePanel> {
   }
 
   void _dismiss() {
-    widget.onDismiss();
+    if (widget.onDismiss != null) {
+      widget.onDismiss!();
+    }
   }
 
   Future<void> _importAccount() async {
-    if (_selectedIdentity == null || _funderAddress == null) {
+    if (_selectedIdentity == null || _funderAddress == null || _chain == null) {
       return;
     }
-    final account = Account.fromSignerKey(
-        signerKey: _selectedIdentity.ref(),
-        funder: _funderAddress,
-        chainId: _chain.chainId,
-        version: 1);
-    await UserPreferences().addCachedDiscoveredAccounts([account]);
+    final account = Account.fromSignerKeyRef(
+      signerKey: _selectedIdentity!.ref(),
+      funder: _funderAddress!,
+      chainId: _chain!.chainId,
+      version: 1,
+    );
+    await UserPreferencesVPN().addCachedDiscoveredAccounts([account]);
     log("XXX: saved account: $account");
     widget.onAccount(account);
-  }
-
-  S get s {
-    return S.of(context);
   }
 }
 
@@ -784,16 +809,37 @@ enum _State {
 }
 
 class _TitleContent {
-  String text;
+  final String text;
+  final bool showDismiss;
 
-  bool showDismiss;
-
-  // @nullable the state to return to if the back button is tapped.
-  _State backState;
+  // The state to return to if the back button is tapped.
+  final _State? backState;
 
   _TitleContent({
-    @required this.text,
+    required this.text,
     this.showDismiss = false,
     this.backState,
   });
+}
+
+class DappUtil {
+  static Row buildDappLink(EthereumAddress? signer) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Icon(Icons.link, color: OrchidColors.active, size: 16),
+        Icon(Icons.open_in_new, color: OrchidColors.active, size: 16),
+        Text(
+          "Go to the Orchid dapp -\nFund this account with crypto\non account.orchid.com",
+          textAlign: TextAlign.center,
+          style: OrchidText.linkStyle,
+        ).linkButton(
+            onTapped: () {
+              OrchidUrls.openDapp(signer: signer);
+            },
+            pad_y: 16),
+      ],
+    );
+  }
+
 }

@@ -1,4 +1,4 @@
-import 'package:orchid/orchid.dart';
+import 'package:orchid/orchid/orchid.dart';
 import 'package:orchid/api/orchid_eth/chains.dart';
 import 'package:orchid/orchid/menu/orchid_selector_menu.dart';
 
@@ -6,7 +6,7 @@ typedef ChainSelectorCallback = void Function(Chain chain);
 
 class OrchidChainSelectorMenu extends StatelessWidget {
   final ChainSelectorCallback onSelection;
-  final Chain selected;
+  final Chain? selected;
   final bool enabled;
 
   /// If true the button will be an icon button
@@ -17,14 +17,17 @@ class OrchidChainSelectorMenu extends StatelessWidget {
   final List<Chain> chains =
       Chains.map.values.where((e) => e != Chains.GanacheTest).toList();
 
-  OrchidChainSelectorMenu({
-    Key key,
-    this.selected,
-    @required this.onSelection,
-    this.iconOnly = false,
-    this.enabled = true,
-    this.width,
-  }) : super(key: key);
+  final Color? backgroundColor;
+
+  OrchidChainSelectorMenu(
+      {Key? key,
+      this.selected,
+      required this.onSelection,
+      this.iconOnly = false,
+      this.enabled = true,
+      this.width = OrchidSelectorMenu.DEFAULT_WIDTH,
+      this.backgroundColor})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +46,8 @@ class OrchidChainSelectorMenu extends StatelessWidget {
       enabled: enabled,
       width: width,
       // support testing
-      highlightSelected: selected?.isKnown,
+      highlightSelected: selected?.isKnown ?? true,
+      backgroundColor: backgroundColor,
     );
   }
 }
